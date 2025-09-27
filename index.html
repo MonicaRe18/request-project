@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة الطلبات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Cairo', sans-serif; 
+            background-color: #f3f4f6;
+        }
+        .sidebar {
+            background-color: #ffffff;
+            color: #374151;
+            border-left: 1px solid #e5e7eb;
+        }
+        .sidebar-link {
+            color: #4b5563;
+        }
+        .sidebar-link:hover {
+            background-color: #f3f4f6;
+        }
+        .sidebar-link.active {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .sidebar-link.active:hover {
+            background-color: #4338ca;
+        }
+        .requests-tab-button.active {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        /* Workflow Timeline Styles */
+        .workflow-container { display: flex; justify-content: space-between; align-items: flex-start; padding: 1rem 0; }
+        .workflow-step { text-align: center; flex: 1; position: relative; }
+        .workflow-step .workflow-circle { width: 24px; height: 24px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: white; transition: background-color 0.3s, border-color 0.3s; border: 2px solid transparent; }
+        .workflow-step .workflow-label { font-size: 12px; color: #6b7280; transition: color 0.3s; }
+        .workflow-step .workflow-line { position: absolute; top: 12px; right: 50%; width: 100%; height: 2px; background-color: #e5e7eb; z-index: -1; transition: background-color 0.3s; }
+        .workflow-step:first-child .workflow-line { width: 50%; }
+        .workflow-step:last-child .workflow-line { width: 50%; right: auto; left: 0; }
+        .workflow-step.completed .workflow-circle, .workflow-step.completed .workflow-line { background-color: #10b981; border-color: #10b981; }
+        .workflow-step.completed .workflow-label { color: #059669; }
+        .workflow-step.active .workflow-circle { background-color: #3b82f6; border-color: #3b82f6; }
+        .workflow-step.active .workflow-label { color: #1d4ed8; font-weight: bold; }
+        .workflow-step.active ~ .workflow-step .workflow-line { background-color: #e5e7eb; }
+        .workflow-step.pending .workflow-circle { background-color: #d1d5db; border-color: #d1d5db; }
+        .workflow-step.pending .workflow-label { color: #6b7280; }
+        .workflow-step.rejected .workflow-circle { background-color: #ef4444; border-color: #ef4444; }
+        .workflow-step.rejected .workflow-label { color: #b91c1c; font-weight: bold; }
+        .workflow-step.rejected ~ .workflow-step .workflow-circle,
+        .workflow-step.rejected ~ .workflow-step .workflow-line { background-color: #d1d5db; border-color: #d1d5db; }
+        .workflow-step.rejected ~ .workflow-step .workflow-label { color: #6b7280; font-weight: normal; }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25em 0.6em;
+            font-size: 0.875em;
+            font-weight: 600;
+            border-radius: 9999px;
+        }
+        .status-draft { background-color: #e5e7eb; color: #4b5563; }
+        .status-submitted { background-color: #dbeafe; color: #1d4ed8; }
+        .status-review { background-color: #fef3c7; color: #92400e; }
+        .status-approved { background-color: #d1fae5; color: #065f46; }
+        .status-rejected { background-color: #fee2e2; color: #991b1b; }
+        .required:after { content: ' *'; color: #ef4444; }
+
+        /* Modal & Toast Animations */
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slide-in-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-overlay { animation: fade-in 0.3s ease-out; }
+        .modal-content { animation: slide-in-up 0.4s ease-out; }
+        @keyframes slide-in-down { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slide-out-up { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
+        .toast { position: fixed; top: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 100; animation: slide-in-down 0.5s ease-out forwards; }
+        .toast.hide { animation: slide-out-up 0.5s ease-in forwards; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="sidebar w-64 p-4 space-y-4">
+            <h1 class="text-2xl font-bold text-center text-gray-800">إدارة الطلبات</h1>
+            <nav>
+                <ul>
+                    <li>
+                        <a href="#" id="nav-land-requests" class="sidebar-link flex items-center p-2 rounded-lg active">
+                            <svg class="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            طلبات تخصيص الأراضي
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="nav-rescheduling-requests" class="sidebar-link flex items-center p-2 rounded-lg">
+                            <svg class="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            طلبات الجدولة
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="nav-other-requests" class="sidebar-link flex items-center p-2 rounded-lg">
+                           <svg class="w-6 h-6 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                            طلبات أخرى
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6 sm:p-8 md:p-10 overflow-y-auto">
+            <div id="view-container">
+                <!-- Land Requests Summary View -->
+                <div id="land-requests-view" class="bg-white p-6 sm:p-8 rounded-xl shadow-md">
+                    <header class="pb-4 border-b border-gray-200">
+                        <h2 class="text-2xl font-bold text-gray-800">طلبات تخصيص الأراضي</h2>
+                        <p class="text-sm text-gray-500">عرض الأراضي التي تم تقديم طلبات عليها.</p>
+                    </header>
+                    <div class="mt-6 space-y-4">
+                        <div id="requests-status-filter-tabs" class="flex flex-wrap gap-2 border-b border-gray-200 pb-2">
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none active" data-filter="all">الكل</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="new">طلبات جديدة</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="review">قيد المراجعة</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="allocated">تم تخصيصها</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="rejected">الطلبات المرفوضة</button>
+                        </div>
+                         <div id="requests-mechanism-filter-tabs" class="flex flex-wrap gap-2">
+                            <span class="text-sm font-medium text-gray-700 self-center">آلية الطرح:</span>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none active" data-filter="all">الكل</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="auction">مزاد</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="initiative">مبادرة</button>
+                            <button type="button" class="requests-tab-button px-4 py-1.5 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-600 focus:outline-none" data-filter="direct_order">أمر مباشر</button>
+                        </div>
+                    </div>
+                    <div class="mt-8 overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm overflow-hidden">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الأرض</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الموقع</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">آلية الطرح</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">عدد الطلبات</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requests-summary-table-body" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- Requests for a Specific Land View -->
+                <div id="request-details-view" class="hidden">
+                    <header class="flex items-center justify-between pb-4 border-b bg-white p-6 rounded-t-xl shadow-md"><h2 class="text-2xl font-bold text-gray-800">تفاصيل الطلبات للأرض رقم <span id="details-land-id"></span></h2><button id="back-to-requests-list-btn" class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>العودة لقائمة الطلبات</button></header>
+                    <div class="bg-white p-6 sm:p-8 shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">بيانات الأرض</h3><div id="request-land-details-card" class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 text-sm"></div></div>
+                    <div class="mt-8 bg-white p-6 sm:p-8 shadow-md"><h3 class="text-lg font-semibold text-gray-800 mb-4">الطلبات المقدمة</h3><div class="overflow-x-auto"><table class="min-w-full bg-white rounded-lg shadow-sm overflow-hidden"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم مقدم الطلب</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الطلب</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التأهيل للمزاد</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th></tr></thead><tbody id="requests-for-land-table-body" class="divide-y divide-gray-200"></tbody></table></div></div>
+                    <div id="allocation-card-container" class="hidden mt-8 bg-white p-6 sm:p-8 rounded-xl shadow-md"></div>
+                </div>
+                <!-- Single Land Request Details View -->
+                <div id="single-request-details-view" class="hidden">
+                     <header class="flex items-center justify-between pb-4 border-b bg-white p-6 rounded-t-xl shadow-md"><h2 class="text-2xl font-bold text-gray-800">تفاصيل الطلب</h2><button id="back-to-request-list-for-land-btn" class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>العودة لطلبات الأرض</button></header>
+                    <div class="bg-white p-6 shadow-md"><h3 class="text-lg font-semibold text-gray-800 mb-4">مراحل سير عمل الطلب</h3><div id="request-workflow-container" class="workflow-container"></div></div>
+                    <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 space-y-8">
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">بيانات مقدم الطلب</h3><div id="applicant-details-card" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">الرسوم المدفوعة</h3><div id="fees-paid-container" class="overflow-x-auto"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">المشروع المقترح</h3><p id="proposed-project-text" class="text-sm text-gray-600 leading-relaxed"></p></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">المرفقات</h3><ul id="attachments-list" class="space-y-3"></ul></div>
+                        </div>
+                        <div class="lg:col-span-1 space-y-8">
+                            <div id="auction-status-container"></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">إجراءات الطلب</h3><div id="request-actions-container" class="space-y-3"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">إرسال ملاحظات</h3><textarea id="notes-for-investor" rows="4" class="w-full p-2 border rounded-md bg-gray-50" placeholder="اكتب ملاحظاتك هنا..."></textarea><button id="send-notes-btn" class="mt-3 w-full px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700">إرسال</button></div>
+                        </div>
+                    </div>
+                    <div class="mt-8 bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">سجل الطلب</h3><div id="request-log-container" class="space-y-4 max-h-96 overflow-y-auto"></div></div>
+                </div>
+
+                <!-- Rescheduling List View -->
+                <div id="rescheduling-list-view" class="hidden">
+                    <header class="flex items-center justify-between pb-4 border-b bg-white p-6 rounded-t-xl shadow-md">
+                        <div>
+                             <h2 class="text-2xl font-bold text-gray-800">قائمة طلبات الجدولة</h2>
+                             <p class="text-sm text-gray-500">عرض جميع طلبات جدولة المستحقات المقدمة.</p>
+                        </div>
+                    </header>
+                    <div class="mt-8 overflow-x-auto bg-white p-6 rounded-b-xl shadow-md">
+                        <table class="min-w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم المستثمر</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم العقد</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الطلب</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجمالي المبلغ</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rescheduling-list-body" class="divide-y divide-gray-200">
+                                <!-- Rescheduling list rows will be dynamically inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Rescheduling Request Details View -->
+                <div id="rescheduling-details-view" class="hidden">
+                     <header class="flex items-center justify-between pb-4 border-b bg-white p-6 rounded-t-xl shadow-md"><h2 class="text-2xl font-bold text-gray-800">تفاصيل طلب الجدولة رقم <span id="rescheduling-details-id"></span></h2><button id="back-to-rescheduling-list-btn" class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>العودة للقائمة</button></header>
+                    <div id="rescheduling-workflow-container" class="workflow-container bg-white p-6 shadow-md"></div>
+                    <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 space-y-8">
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><div class="flex justify-between items-center border-b pb-3 mb-6"><h3 class="text-lg font-semibold text-gray-800">بيانات عامة</h3></div><div id="rescheduling-general-details-card" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><div class="flex justify-between items-center border-b pb-3 mb-6"><h3 class="text-lg font-semibold text-gray-800">تفاصيل طلب الجدولة</h3><button id="edit-rescheduling-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300">إضافة جدولة</button></div><div id="rescheduling-request-details-card" class="space-y-4 text-sm"></div><div id="rescheduling-save-btn-container" class="pt-4 mt-4 border-t hidden"><button id="save-rescheduling-changes-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700">حفظ التعديلات</button></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">جدول خطة السداد المقترحة</h3><div id="rescheduling-payment-plan-container" class="overflow-x-auto"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">المرفقات</h3><ul id="rescheduling-attachments-list" class="space-y-3"></ul></div>
+                        </div>
+                        <div class="lg:col-span-1 space-y-8">
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">إجراءات الطلب</h3><div id="rescheduling-actions-container" class="space-y-3"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">سجل الطلب</h3><div id="rescheduling-log-container" class="space-y-4 max-h-96 overflow-y-auto"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Other Requests List View -->
+                <div id="other-requests-view" class="hidden bg-white p-6 sm:p-8 rounded-xl shadow-md">
+                     <header class="pb-4 border-b border-gray-200"><h2 class="text-2xl font-bold text-gray-800">طلبات أخرى</h2><p class="text-sm text-gray-500">طلبات متنوعة مقدمة من المستثمرين.</p></header>
+                    <div class="mt-8 overflow-x-auto"><table class="min-w-full bg-white rounded-lg shadow-sm overflow-hidden"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الطلب</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم المستثمر</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع الطلب</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الطلب</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th></tr></thead><tbody id="other-requests-summary-table-body" class="divide-y divide-gray-200"></tbody></table></div>
+                </div>
+                <!-- Other Request Details -->
+                <div id="other-request-details-view" class="hidden">
+                     <header class="flex items-center justify-between pb-4 border-b bg-white p-6 rounded-t-xl shadow-md"><h2 class="text-2xl font-bold text-gray-800">تفاصيل الطلب رقم <span id="other-request-details-id"></span></h2><button id="back-to-other-requests-list-btn" class="flex items-center px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>العودة لقائمة الطلبات</button></header>
+                    <div class="bg-white p-6 shadow-md"><h3 class="text-lg font-semibold text-gray-800 mb-4">مراحل سير عمل الطلب</h3><div id="other-request-workflow-container" class="workflow-container"></div></div>
+                    <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 space-y-8">
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">بيانات الطلب</h3><div id="other-request-applicant-card" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">بيان الطلب</h3><p id="other-request-description-text" class="text-sm text-gray-600 leading-relaxed"></p></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">المرفقات</h3><ul id="other-request-attachments-list" class="space-y-3"></ul></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">الرسوم المطلوبة</h3><div id="other-request-fees-container"></div></div>
+                        </div>
+                        <div class="lg:col-span-1 space-y-8">
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">قرار وتأشيرة المحافظ</h3><div id="other-request-governor-decision-container"></div></div>
+                            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">إجراءات الطلب</h3><div id="other-request-actions-container" class="space-y-3"></div></div>
+                        </div>
+                    </div>
+                    <div class="mt-8 bg-white p-6 sm:p-8 rounded-xl shadow-md"><h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">سجل الطلب</h3><div id="other-request-log-container" class="space-y-4 max-h-96 overflow-y-auto"></div></div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+    
+    <!-- Modals -->
+    <div id="reject-reason-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay">
+         <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content">
+             <div class="flex justify-between items-center pb-3 border-b"><h3 class="text-lg font-bold text-gray-900">سبب الرفض</h3><button id="close-reject-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div>
+            <div class="mt-4 space-y-4">
+                <div><label for="rejection-reason-text" class="block mb-2 text-sm font-medium text-gray-700">سبب الرفض</label><textarea id="rejection-reason-text" rows="3" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" placeholder="اكتب سبب الرفض هنا..."></textarea></div>
+                <div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-rejection-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700">تأكيد الرفض</button><button type="button" id="cancel-rejection-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div>
+            </div>
+        </div>
+    </div>
+    <div id="send-payment-request-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay">
+         <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content">
+             <div class="flex justify-between items-center pb-3 border-b"><h3 class="text-lg font-bold text-gray-900">إرسال طلبات دفع</h3><button id="close-payment-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div>
+            <div id="payment-requests-list" class="mt-4 space-y-2"></div>
+            <div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-payment-request-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700">إرسال الطلبات المحددة</button><button type="button" id="cancel-payment-request-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div>
+        </div>
+    </div>
+    <div id="request-attachment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay">
+         <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content">
+             <div class="flex justify-between items-center pb-3 border-b"><h3 class="text-lg font-bold text-gray-900">طلب مرفق إضافي</h3><button id="close-attachment-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div>
+            <div class="mt-4 space-y-4">
+                <div><label for="attachment-name-select" class="block mb-2 text-sm font-medium text-gray-700">اسم المرفق المطلوب</label><select id="attachment-name-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"></select></div>
+                <div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-attachment-request-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700">إرسال الطلب</button><button type="button" id="cancel-attachment-request-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div>
+            </div>
+        </div>
+    </div>
+    <div id="confirm-award-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay">
+         <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content">
+             <div class="flex justify-between items-center pb-3 border-b"><h3 id="award-modal-title" class="text-lg font-bold text-gray-900">تأكيد قرار الترسية</h3><button id="close-award-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div>
+            <div class="mt-4 space-y-4">
+                <p class="text-sm">أنت على وشك تخصيص الأرض لـ <strong id="awardee-name-confirm"></strong>. سيؤدي هذا إلى رفض جميع الطلبات الأخرى لهذه الأرض. هل أنت متأكد؟</p>
+                <div><label for="final-price-input" class="block mb-2 text-sm font-medium text-gray-700 required">سعر الفدان بعد المزاد (بالجنيه المصري)</label><input type="number" id="final-price-input" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" placeholder="0.00" required></div>
+                <div><label for="governor-notes-input" class="block mb-2 text-sm font-medium text-gray-700">تأشيرة المحافظ (ملاحظات القرار)</label><textarea id="governor-notes-input" rows="3" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" placeholder="اكتب ملاحظات القرار هنا..."></textarea></div>
+                <div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-award-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700">تأكيد التخصيص</button><button type="button" id="cancel-award-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div>
+            </div>
+        </div>
+    </div>
+    <div id="add-fee-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay"><div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content"><div class="flex justify-between items-center pb-3 border-b"><h3 class="text-lg font-bold text-gray-900">طلب سداد رسوم</h3><button id="close-add-fee-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div><div class="mt-4 space-y-4"><div><label for="fee-name-input" class="block mb-2 text-sm font-medium text-gray-700">بيان الرسوم</label><input type="text" id="fee-name-input" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" placeholder="مثال: رسوم مراجعة فنية"></div><div><label for="fee-amount-input" class="block mb-2 text-sm font-medium text-gray-700">المبلغ الإجمالي (بالجنيه المصري)</label><input type="number" id="fee-amount-input" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5"></div><div><label class="block mb-2 text-sm font-medium text-gray-700">طريقة السداد</label><div class="flex gap-4"><label class="flex items-center"><input type="radio" name="payment-method" value="single" class="ml-2" checked> دفعة واحدة</label><label class="flex items-center"><input type="radio" name="payment-method" value="installments" class="ml-2"> أقساط</label></div></div><div id="installments-details-container" class="hidden space-y-2"><label for="installments-count-input" class="block text-sm font-medium text-gray-700">عدد الأقساط</label><input type="number" id="installments-count-input" min="2" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5"></div><div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-add-fee-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700">إضافة ومطالبة</button><button type="button" id="cancel-add-fee-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div></div></div></div>
+    <div id="request-other-attachment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay"><div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content"><div class="flex justify-between items-center pb-3 border-b"><h3 class="text-lg font-bold text-gray-900">طلب مرفق إضافي</h3><button id="close-other-attachment-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div><div class="mt-4 space-y-4"><div><label for="other-attachment-name-input" class="block mb-2 text-sm font-medium text-gray-700">اسم المرفق المطلوب</label><input type="text" id="other-attachment-name-input" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" placeholder="مثال: موافقة هيئة البيئة"></div><div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-other-attachment-request-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700">إرسال الطلب</button><button type="button" id="cancel-other-attachment-request-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div></div></div></div>
+    <!-- Governor Signature Modal -->
+    <div id="governor-signature-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 modal-overlay">
+         <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white modal-content">
+             <div class="flex justify-between items-center pb-3 border-b"><h3 class="text-lg font-bold text-gray-900">تأشيرة المحافظ</h3><button id="close-governor-signature-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button></div>
+            <div class="mt-4 space-y-4">
+                <div><label for="governor-signature-notes" class="block mb-2 text-sm font-medium text-gray-700">تأشيرة كتابية</label><textarea id="governor-signature-notes" rows="3" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" placeholder="اكتب التأشيرة هنا..."></textarea></div>
+                <div><label for="governor-signature-file" class="block mb-2 text-sm font-medium text-gray-700">أو إرفاق ملف التأشيرة</label><input type="file" id="governor-signature-file" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50"></div>
+                <div class="items-center px-4 py-3 sm:flex sm:flex-row-reverse gap-2 mt-4 border-t pt-4"><button id="confirm-governor-signature-btn" class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700">تأكيد وإرسال</button><button type="button" id="cancel-governor-signature-btn" class="mt-3 sm:mt-0 w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50">إلغاء</button></div>
+            </div>
+        </div>
+    </div>
+    <!-- Investor Details Modal -->
+    <div id="investor-details-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 modal-overlay">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white modal-content">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 class="text-xl font-bold text-gray-900">سجل المستثمر: <span id="investor-modal-name"></span></h3>
+                <button id="close-investor-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-lg mb-2">معلومات المستثمر</h4>
+                    <div id="investor-modal-info" class="space-y-2 text-sm"></div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-lg mb-2">المستحقات المالية</h4>
+                    <div id="investor-modal-dues" class="space-y-2 text-sm"></div>
+                </div>
+                <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-lg mb-2">تفاصيل الأرض المحددة</h4>
+                    <div id="investor-modal-land-details" class="text-sm"></div>
+                </div>
+                 <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-lg mb-2">الطلبات المقدمة</h4>
+                    <div id="investor-modal-requests" class="space-y-2 text-sm max-h-40 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Attachment Viewer Modal -->
+    <div id="view-attachment-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 modal-overlay">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white modal-content">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 class="text-xl font-bold text-gray-900">عرض المستند: <span id="attachment-modal-filename"></span></h3>
+                <button id="close-attachment-viewer-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="mt-4">
+                <div id="attachment-viewer-content" class="w-full h-[70vh] bg-gray-200 flex items-center justify-center text-gray-500">
+                    <p>محتوى المستند يظهر هنا...</p>
+                    <!-- In a real app, an <iframe a <embed> would be used here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast-notification" class="hidden toast p-4 rounded-md shadow-lg text-white"><p id="toast-message"></p></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // ########## DATA STORE (STATE) ##########
+            const investors = {
+                'inv01': { name: 'محمد الأحمد', fileNumber: '5012', status: 'منتظم', statusColor: 'green', daysOverdue: 0, nationalId: '12345678901234' },
+                'inv02': { name: 'مؤسسة الصحراء الخضراء', status: 'متخلف جزئيا', statusColor: 'yellow', daysOverdue: 15, nationalId: '23456789012345' },
+                'inv03': { name: 'مستثمر فردي', status: 'منتظم', statusColor: 'green', daysOverdue: 0, nationalId: '34567890123456' },
+                'inv04': { name: 'جمعية زراعة النخيل', status: 'متخلف كليا', statusColor: 'red', daysOverdue: 45, nationalId: '45678901234567' },
+                'inv05': { name: 'شركة الاستثمار الزراعي', status: 'منتظم', statusColor: 'green', daysOverdue: 0, nationalId: '56789012345678' },
+                'inv06': { name: 'محمد عبد الله', status: 'منتظم', statusColor: 'green', daysOverdue: 0, nationalId: '67890123456789' },
+            };
+
+            // --- Land Requests Data ---
+            const availableLands = [ 
+                { id: 201, center: "مركز الخارجة", village: "قرية المنيرة", areaFeddans: 200.00 }, 
+                { id: 301, center: "مركز الداخلة", village: "قرية موط", areaFeddans: 200.20 }, 
+                { id: 401, center: "الخارجة", village: "شمال المدينة الصناعية", areaFeddans: 100.00 }, 
+                { id: 501, center: "مركز باريس", village: "قرية بغداد", areaFeddans: 400.00 }, 
+            ];
+            const landMechanismMap = { auction: 'مزاد علني', direct_order: 'أمر مباشر', initiative: 'مبادرة' };
+            const landPredefinedAttachments = ['شهادة خبرة', 'سجل تجاري حديث', 'البطاقة الضريبية', 'ملف الشركة'];
+            const landWorkflowSteps = [ { key: 'submission', label: 'تقديم الطلب' }, { key: 'technical_review', label: 'المراجعة الفنية' }, { key: 'financial_review', label: 'المراجعة المالية' }, { key: 'governor_decision', label: 'قرار المحافظ' } ];
+            let offeringsList = [ { id: 'uuid1', mechanism: 'auction', currency: 'EGP', auctionDate: '2025-09-15', lands: [ { landId: 201, pricePerFeddans: 5000, awardDetails: null }, { landId: 301, pricePerFeddans: 7500, awardDetails: null } ] }, { id: 'uuid2', mechanism: 'direct_order', currency: 'USD', lands: [ { landId: 401, pricePerFeddans: 4000, awardDetails: null } ] }, { id: 'uuid3', mechanism: 'initiative', currency: 'EGP', lands: [ { landId: 501, pricePerFeddans: 3500, awardDetails: null } ] }, ];
+            let landRequestsData = [
+                { requestId: 'req001', investorId: 'inv01', landId: 201, requestDate: '2025-06-26', status: 'pending', workflowStage: 'financial_review', proposedProject: 'مشروع زراعة محاصيل استراتيجية.', attachments: [{name: 'دراسة_الجدوى.pdf', status: 'verified'}, {name: 'السجل_التجاري.pdf', status: 'pending'}], feesPaid: [{item: 'كراسة الشروط', amount: 350, status: 'paid', history: []}, {item: 'التأمين الابتدائي', amount: 500, status: 'pending', history: []}], log: [{type: 'workflow', user: 'النظام', date: '2025-07-22T14:00:00Z', to: 'financial_review'}] },
+                { requestId: 'req002', investorId: 'inv02', landId: 201, requestDate: '2025-06-27', status: 'pending', workflowStage: 'financial_review', finalPrice: 6500, proposedProject: 'مشروع استصلاح وزراعة أشجار مثمرة.', attachments: [{name: 'خطة_المشروع.pdf', status: 'verified'}], feesPaid: [{item: 'كراسة الشروط', amount: 350, status: 'paid', history: []}, {item: 'التأمين الابتدائي', amount: 500, status: 'paid', history: []}], log: [{type: 'workflow', user: 'النظام', date: '2025-07-20T09:00:00Z', to: 'financial_review'}] },
+                { requestId: 'req003', investorId: 'inv01', landId: 401, requestDate: '2025-06-27', status: 'awarded', workflowStage: 'governor_decision', finalPrice: 4000, proposedProject: 'مشروع إنتاج حيواني متكامل.', attachments: [{name: 'الملف_الشخصي.pdf', status: 'verified'}], feesPaid: [{item: 'رسم كروكي', amount: 500, status: 'paid', history: []}, {item: 'مشاركة مجتمعية', amount: 1000, status: 'paid', history: []}, {item: 'تأمين سنوي', amount: 15000, status: 'paid', history: []}], log: [], awardDetails: { mechanism: 'auction', auctionDate: '2023-01-15', auctionNumber: 'MZ-2023-01', handoverDate: '2023-03-01', exemptionPeriod: 'سنتين و 60 يوم' } },
+                { requestId: 'req004', investorId: 'inv04', landId: 501, requestDate: '2025-06-29', status: 'attachment_rejected', workflowStage: 'submission', proposedProject: 'توسعة زراعات النخيل ضمن المبادرة.', attachments: [{name: 'طلب_الانضمام.pdf', status: 'rejected', rejectionReason: 'المستند غير واضح.', resubmissionRequestedOn: '2025-07-28T10:00:00Z'}], feesPaid: [{item: 'رسم كروكي', amount: 500, status: 'paid', history: []}, {item: 'مشاركة مجتمعية', amount: 1000, status: 'pending', history: []}], log: [] },
+                { requestId: 'req005', investorId: 'inv05', landId: 301, requestDate: '2025-07-01', status: 'pending', workflowStage: 'submission', proposedProject: 'زراعة نباتات طبية وعطرية.', attachments: [{name: 'طلب.pdf', status: 'pending'}], feesPaid: [], log: []},
+                { requestId: 'req006', investorId: 'inv06', landId: 401, requestDate: '2025-07-02', status: 'rejected', rejectionReason: 'المشروع لا يتوافق مع خطة التنمية.', workflowStage: 'technical_review', proposedProject: 'مشروع شخصي صغير.', attachments: [], feesPaid: [{item: 'رسم كروكي', amount: 500, status: 'paid', history: []}], log: []},
+            ];
+            
+            // --- Rescheduling Requests Data ---
+            const reschedulingWorkflowSteps = [ { key: 'submission', label: 'تقديم الطلب' }, { key: 'financial_review', label: 'الإدارة المالية' }, { key: 'governor_approval', label: 'تأشيرة المحافظ' }, { key: 'completed', label: 'مكتمل' } ];
+            let reschedulingRequestsData = [
+                { id: 'rs001', investorId: 'inv01', contractId: 'C-2024-101', requestDate: '2025-07-20', totalDue: 500000, daysOverdue: 90, status: 'approved', workflowStage: 'completed', reason: 'ظروف مالية طارئة بسبب تغيرات في السوق.', proposedStartDate: '2025-09-01', installmentsCount: 12, penaltyApplied: false, penaltyAmount: 0, attachments: [{name: 'طلب الجدولة الرسمي.pdf', status: 'verified'}], log: [{type: 'submission', user: 'المستثمر', date: '2025-07-20T10:00:00Z'}, {type: 'workflow', user: 'مدير المالية', date: '2025-07-21T15:00:00Z', to: 'governor_approval'}, {type: 'governor_decision', user: 'المحافظ', date: '2025-07-23T12:00:00Z', decision: 'approved', notes: 'موافقة مع المتابعة الدورية.'}] },
+                { id: 'rs002', investorId: 'inv02', contractId: 'C-2024-105', requestDate: '2025-07-22', totalDue: 250000, daysOverdue: 35, status: 'review', workflowStage: 'financial_review', reason: 'تأخر في تحصيل مستحقات من العملاء.', proposedStartDate: '2025-08-15', installmentsCount: 6, penaltyApplied: true, penaltyAmount: 12500, attachments: [{name: 'خطاب رسمي.pdf', status: 'verified'}, {name: 'كشف حساب.pdf', status: 'rejected', rejectionReason: 'الملف غير واضح'}], log: [{type: 'submission', user: 'المستثمر', date: '2025-07-22T11:00:00Z'}] },
+                { id: 'rs003', investorId: 'inv04', contractId: 'C-2023-080', requestDate: '2025-07-25', totalDue: 75000, daysOverdue: 120, status: 'submitted', workflowStage: 'submission', reason: 'مشاكل في المحصول أثرت على السيولة.', proposedStartDate: '2025-08-01', installmentsCount: 4, penaltyApplied: true, penaltyAmount: 5000, attachments: [], log: [{type: 'submission', user: 'المستثمر', date: '2025-07-25T16:00:00Z'}] },
+            ];
+            
+            // --- Other Requests Data ---
+            const otherRequestWorkflowSteps = [ { key: 'submission', label: 'تقديم الطلب' }, { key: 'initial_review', label: 'مراجعة مبدئية' }, { key: 'fee_payment', label: 'سداد الرسوم' }, { key: 'final_review', label: 'مراجعة نهائية' }, { key: 'governor_approval', label: 'اعتماد المحافظ' }, { key: 'completed', label: 'مكتمل' } ];
+            let otherRequestsData = [
+                { id: 'other001', investorId: 'inv01', typeText: 'صيانة', date: '2025-07-25', description: 'طلب صيانة عاجلة لشبكة الري الرئيسية.', status: 'review', statusText: 'قيد المراجعة', workflowStage: 'initial_review', attachments: [{name: 'صور_الأعطال.zip', status: 'verified'}, {name: 'تقرير_فني_مبدئي.pdf', status: 'pending'}], fees: null, governorDecision: { approved: null, notes: '' }, log: [{type: 'submission', user: 'شركة الوادي الجديد', date: '2025-07-25T10:00:00Z'}] },
+                { id: 'other002', investorId: 'inv03', typeText: 'طلب خاص', date: '2025-07-28', description: 'طلب الموافقة على تغيير النشاط.', status: 'fee_pending', statusText: 'في انتظار سداد الرسوم', workflowStage: 'fee_payment', attachments: [{name: 'دراسة_الجدوى_الجديدة.pdf', status: 'verified'}], fees: { name: 'رسوم تغيير النشاط', totalAmount: 7500, paymentMethod: 'installments', installments: [{ amount: 2500, status: 'paid'}, { amount: 5000, status: 'pending'}] }, governorDecision: { approved: null, notes: '' }, log: [ {type: 'fee_request', user: 'مدير النظام', date: '2025-07-29T11:00:00Z', feeName: 'رسوم تغيير النشاط', amount: 7500}, {type: 'submission', user: 'مستثمر فردي', date: '2025-07-28T14:30:00Z'} ] },
+            ];
+
+            // --- Current State ---
+            let currentLandIdForDetails = null;
+            let currentRequestIdForView = null;
+            let currentReschedulingRequestId = null;
+            let isReschedulingInEditMode = false;
+            let currentOtherRequestId = null;
+            let currentAttachmentForRejection = null; // { type: 'land' | 'other' | 'rescheduling', requestId: string, index: number }
+
+            // ########## UI Elements Cache ##########
+            const ui = {
+                viewContainer: document.getElementById('view-container'),
+                sidebar: document.getElementById('sidebar'),
+                landRequestsView: document.getElementById('land-requests-view'),
+                requestDetailsView: document.getElementById('request-details-view'),
+                singleRequestDetailsView: document.getElementById('single-request-details-view'),
+                reschedulingListView: document.getElementById('rescheduling-list-view'),
+                reschedulingDetailsView: document.getElementById('rescheduling-details-view'),
+                reschedulingListBody: document.getElementById('rescheduling-list-body'),
+                reschedulingDetailsId: document.getElementById('rescheduling-details-id'),
+                reschedulingWorkflowContainer: document.getElementById('rescheduling-workflow-container'),
+                reschedulingGeneralDetailsCard: document.getElementById('rescheduling-general-details-card'),
+                reschedulingRequestDetailsCard: document.getElementById('rescheduling-request-details-card'),
+                reschedulingPaymentPlanContainer: document.getElementById('rescheduling-payment-plan-container'),
+                reschedulingAttachmentsList: document.getElementById('rescheduling-attachments-list'),
+                reschedulingActionsContainer: document.getElementById('rescheduling-actions-container'),
+                reschedulingLogContainer: document.getElementById('rescheduling-log-container'),
+                reschedulingSaveBtnContainer: document.getElementById('rescheduling-save-btn-container'),
+                requestsSummaryTableBody: document.getElementById('requests-summary-table-body'),
+                requestsStatusFilterTabs: document.getElementById('requests-status-filter-tabs'),
+                requestsMechanismFilterTabs: document.getElementById('requests-mechanism-filter-tabs'),
+                detailsLandIdSpan: document.getElementById('details-land-id'),
+                requestLandDetailsCard: document.getElementById('request-land-details-card'),
+                requestsForLandTableBody: document.getElementById('requests-for-land-table-body'),
+                backToRequestsListBtn: document.getElementById('back-to-requests-list-btn'),
+                backToRequestListForLandBtn: document.getElementById('back-to-request-list-for-land-btn'),
+                backToReschedulingListBtn: document.getElementById('back-to-rescheduling-list-btn'),
+                applicantDetailsCard: document.getElementById('applicant-details-card'),
+                proposedProjectText: document.getElementById('proposed-project-text'),
+                requestLogContainer: document.getElementById('request-log-container'),
+                attachmentsList: document.getElementById('attachments-list'),
+                requestWorkflowContainer: document.getElementById('request-workflow-container'),
+                feesPaidContainer: document.getElementById('fees-paid-container'),
+                auctionStatusContainer: document.getElementById('auction-status-container'),
+                allocationCardContainer: document.getElementById('allocation-card-container'),
+                requestActionsContainer: document.getElementById('request-actions-container'),
+                otherRequestsView: document.getElementById('other-requests-view'),
+                otherRequestsSummaryTableBody: document.getElementById('other-requests-summary-table-body'),
+                otherRequestDetailsView: document.getElementById('other-request-details-view'),
+                otherRequestDetailsId: document.getElementById('other-request-details-id'),
+                backToOtherRequestsListBtn: document.getElementById('back-to-other-requests-list-btn'),
+                otherRequestWorkflowContainer: document.getElementById('other-request-workflow-container'),
+                otherRequestApplicantCard: document.getElementById('other-request-applicant-card'),
+                otherRequestDescriptionText: document.getElementById('other-request-description-text'),
+                otherRequestAttachmentsList: document.getElementById('other-request-attachments-list'),
+                otherRequestFeesContainer: document.getElementById('other-request-fees-container'),
+                otherRequestGovernorDecisionContainer: document.getElementById('other-request-governor-decision-container'),
+                otherRequestActionsContainer: document.getElementById('other-request-actions-container'),
+                otherRequestLogContainer: document.getElementById('other-request-log-container'),
+                rejectReasonModal: document.getElementById('reject-reason-modal'),
+                closeRejectModalBtn: document.getElementById('close-reject-modal-btn'),
+                confirmRejectionBtn: document.getElementById('confirm-rejection-btn'),
+                cancelRejectionBtn: document.getElementById('cancel-rejection-btn'),
+                sendPaymentRequestModal: document.getElementById('send-payment-request-modal'),
+                closePaymentModalBtn: document.getElementById('close-payment-modal-btn'),
+                confirmPaymentRequestBtn: document.getElementById('confirm-payment-request-btn'),
+                cancelPaymentRequestBtn: document.getElementById('cancel-payment-request-btn'),
+                paymentRequestsList: document.getElementById('payment-requests-list'),
+                requestAttachmentModal: document.getElementById('request-attachment-modal'),
+                closeAttachmentModalBtn: document.getElementById('close-attachment-modal-btn'),
+                confirmAttachmentRequestBtn: document.getElementById('confirm-attachment-request-btn'),
+                cancelAttachmentRequestBtn: document.getElementById('cancel-attachment-request-btn'),
+                confirmAwardModal: document.getElementById('confirm-award-modal'),
+                closeAwardModalBtn: document.getElementById('close-award-modal-btn'),
+                confirmAwardBtn: document.getElementById('confirm-award-btn'),
+                cancelAwardBtn: document.getElementById('cancel-award-btn'),
+                addFeeModal: document.getElementById('add-fee-modal'),
+                closeAddFeeModalBtn: document.getElementById('close-add-fee-modal-btn'),
+                cancelAddFeeBtn: document.getElementById('cancel-add-fee-btn'),
+                confirmAddFeeBtn: document.getElementById('confirm-add-fee-btn'),
+                installmentsDetailsContainer: document.getElementById('installments-details-container'),
+                requestOtherAttachmentModal: document.getElementById('request-other-attachment-modal'),
+                closeOtherAttachmentModalBtn: document.getElementById('close-other-attachment-modal-btn'),
+                cancelOtherAttachmentRequestBtn: document.getElementById('cancel-other-attachment-request-btn'),
+                confirmOtherAttachmentRequestBtn: document.getElementById('confirm-other-attachment-request-btn'),
+                governorSignatureModal: document.getElementById('governor-signature-modal'),
+                closeGovernorSignatureModalBtn: document.getElementById('close-governor-signature-modal-btn'),
+                confirmGovernorSignatureBtn: document.getElementById('confirm-governor-signature-btn'),
+                cancelGovernorSignatureBtn: document.getElementById('cancel-governor-signature-btn'),
+                investorDetailsModal: document.getElementById('investor-details-modal'),
+                closeInvestorModalBtn: document.getElementById('close-investor-modal-btn'),
+                viewAttachmentModal: document.getElementById('view-attachment-modal'),
+                closeAttachmentViewerBtn: document.getElementById('close-attachment-viewer-btn'),
+                attachmentModalFilename: document.getElementById('attachment-modal-filename'),
+                sendNotesBtn: document.getElementById('send-notes-btn'),
+                toastNotification: document.getElementById('toast-notification'),
+                toastMessage: document.getElementById('toast-message'),
+            };
+
+            // ########## Utility Functions ##########
+            const formatCurrency = (value, currency = 'EGP') => { if (typeof value !== 'number') return ''; return value.toLocaleString('ar-EG', { style: 'currency', currency: currency, minimumFractionDigits: 2 }); };
+            const showToast = (message, isSuccess = true) => { ui.toastMessage.textContent = message; ui.toastNotification.className = `toast p-4 rounded-md shadow-lg text-white ${isSuccess ? 'bg-green-500' : 'bg-red-500'}`; ui.toastNotification.classList.remove('hidden', 'hide'); setTimeout(() => { ui.toastNotification.classList.add('hide'); setTimeout(() => ui.toastNotification.classList.add('hidden'), 500); }, 3000); };
+
+            // ########## Page State Management ##########
+            function showView(viewId) { 
+                Object.values(ui.viewContainer.children).forEach(view => { 
+                    if(view.id) view.classList.add('hidden') 
+                }); 
+                const viewToShow = document.getElementById(viewId); 
+                if(viewToShow) viewToShow.classList.remove('hidden'); 
+            }
+
+            // ########## Generic Rendering Functions ##########
+            function renderWorkflow(currentStageKey, requestStatus, container, workflowSteps) { container.innerHTML = ''; const currentStageIndex = workflowSteps.findIndex(step => step.key === currentStageKey); const isRejected = requestStatus === 'rejected' || requestStatus === 'attachment_rejected'; workflowSteps.forEach((step, index) => { const stepDiv = document.createElement('div'); stepDiv.className = 'workflow-step'; let statusClass = 'pending'; if (isRejected && index === currentStageIndex) statusClass = 'rejected'; else if (index < currentStageIndex || requestStatus === 'completed' || requestStatus === 'approved' || requestStatus === 'awarded') statusClass = 'completed'; else if (index === currentStageIndex && !isRejected) statusClass = 'active'; stepDiv.classList.add(statusClass); stepDiv.innerHTML = `${index > 0 ? '<div class="workflow-line"></div>' : ''}<div class="workflow-circle">${index + 1}</div><div class="workflow-label">${step.label}</div>`; container.appendChild(stepDiv); }); }
+            function renderLog(request, container, workflowSteps) { container.innerHTML = ''; const logData = request.log || []; if (logData.length === 0) { container.innerHTML = `<p class="text-sm text-center text-gray-500 p-4">لا يوجد سجل للطلب.</p>`; return; } const sortedLog = [...logData].sort((a, b) => new Date(b.date) - new Date(a.date)); sortedLog.forEach(log => { const logDiv = document.createElement('div'); logDiv.className = 'flex items-start space-x-3 space-x-reverse'; const logDate = new Date(log.date).toLocaleString('ar-EG', {dateStyle: 'medium', timeStyle: 'short'}); let icon = '', text = ''; switch(log.type) { case 'submission': text = `<strong>${log.user}</strong> قام بتقديم الطلب.`; break; case 'workflow': const stage = workflowSteps.find(s => s.key === log.to)?.label || log.to; text = `<strong>${log.user}</strong> قام بتغيير مرحلة الطلب إلى <span class="font-semibold">${stage}</span>.`; break; case 'note': text = `<strong>${log.user}</strong> أرسل ملاحظة: <span class="text-gray-600">"${log.note}"</span>`; break; case 'fee_request': text = `<strong>${log.user}</strong> طالب بسداد رسوم <span class="font-semibold">"${log.feeName}"</span> بمبلغ <span class="font-semibold">${formatCurrency(log.amount)}</span>.`; break; case 'payment_reminder': text = `<strong>${log.user}</strong> أرسل تنبيهاً لدفع: <span class="font-semibold">${log.feeItem}</span>.`; break; case 'attachment_request': text = `<strong>${log.user}</strong> طلب مرفقاً جديداً: <span class="font-semibold">"${log.fileName}"</span>.`; break; case 'attachment_status': const isVerified = log.status === 'verified'; text = `<strong>${log.user}</strong> قام بـ<strong>${isVerified ? 'قبول' : 'رفض'}</strong> مرفق: <span class="font-semibold">${log.fileName}</span>. ${log.reason ? `السبب: ${log.reason}` : ''}`; break; case 'governor_decision': const isApproved = log.decision === 'approved'; text = `<strong>${log.user}</strong> قام بـ<strong class="${isApproved ? 'text-green-700' : 'text-red-700'}">${isApproved ? 'الموافقة' : 'الرفض'}</strong> على الطلب. التأشيرة: <span class="text-gray-600">"${log.notes}"</span>`; break; default: text = `تحديث: ${log.note || 'تغيير في حالة الطلب.'}`; } logDiv.innerHTML = `<div class="flex-shrink-0">${icon}</div><div class="flex-1"><p class="text-sm text-gray-800">${text}</p><p class="text-xs text-gray-500 mt-1">${logDate}</p></div>`; container.appendChild(logDiv); }); }
+            
+            // ########## "Land Requests" Rendering ##########
+            function renderRequestsSummaryView() {
+                showView('land-requests-view');
+                const tableBody = ui.requestsSummaryTableBody;
+                tableBody.innerHTML = '';
+                
+                const statusFilter = ui.requestsStatusFilterTabs.querySelector('.active').dataset.filter;
+                const mechanismFilter = ui.requestsMechanismFilterTabs.querySelector('.active').dataset.filter;
+
+                let filteredRequests = landRequestsData;
+
+                // Apply status filter
+                if (statusFilter !== 'all') {
+                    const statusMap = {
+                        new: ['submission'],
+                        review: ['technical_review', 'financial_review'],
+                        allocated: ['awarded'],
+                        rejected: ['rejected', 'attachment_rejected']
+                    };
+                    if (statusMap[statusFilter]) {
+                        filteredRequests = filteredRequests.filter(req => statusMap[statusFilter].includes(req.status) || statusMap[statusFilter].includes(req.workflowStage));
+                    }
+                }
+
+                // Apply mechanism filter
+                if (mechanismFilter !== 'all') {
+                    const offeringIds = new Set(offeringsList.filter(o => o.mechanism === mechanismFilter).map(o => o.id));
+                    const landIdsByMechanism = new Set(offeringsList.filter(o => o.mechanism === mechanismFilter).flatMap(o => o.lands.map(l => l.landId)));
+                    filteredRequests = filteredRequests.filter(req => landIdsByMechanism.has(req.landId));
+                }
+
+                const landIdsToShow = new Set(filteredRequests.map(req => req.landId));
+                const requestsByLand = landRequestsData.reduce((acc, req) => { acc[req.landId] = (acc[req.landId] || 0) + 1; return acc; }, {});
+                
+                if (landIdsToShow.size === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500">لا توجد طلبات تطابق هذه الفلاتر.</td></tr>`;
+                    return;
+                }
+
+                landIdsToShow.forEach(landId => {
+                    const land = availableLands.find(l => l.id === landId);
+                    const offering = offeringsList.find(o => o.lands.some(l => l.landId === landId));
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50";
+                    tr.innerHTML = `<td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">${land.id}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${land.center} - ${land.village}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${landMechanismMap[offering.mechanism] || offering.mechanism}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800"><span class="bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full">${requestsByLand[landId]}</span></td><td class="px-6 py-4 whitespace-nowrap text-sm font-medium"><button class="view-requests-btn text-indigo-600 hover:text-indigo-900" data-land-id="${landId}">عرض الطلبات</button></td>`;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            function renderRequestDetailsView(landId) {
+                currentLandIdForDetails = landId;
+                showView('request-details-view');
+                const land = availableLands.find(l => l.id === landId);
+                const requests = landRequestsData.filter(req => req.landId === landId);
+                const offering = offeringsList.find(o => o.lands.some(l => l.landId === landId));
+                const landInOffering = offering.lands.find(l => l.landId === landId);
+                ui.detailsLandIdSpan.textContent = landId;
+                let landDetailsHTML = `<div><span class="font-semibold text-gray-600">المركز:</span><p class="text-gray-800">${land.center}</p></div><div><span class="font-semibold text-gray-600">القرية:</span><p class="text-gray-800">${land.village}</p></div><div><span class="font-semibold text-gray-600">المساحة:</span><p class="text-gray-800">${land.areaFeddans} فدان</p></div><div><span class="font-semibold text-gray-600">سعر الفدان التقديري:</span><p class="text-gray-800">${formatCurrency(landInOffering.pricePerFeddans, offering.currency)}</p></div>`;
+                if(offering.mechanism === 'auction' && offering.auctionDate) {
+                    landDetailsHTML += `<div><span class="font-semibold text-gray-600">تاريخ جلسة المزاد:</span><p class="text-gray-800">${offering.auctionDate}</p></div>`;
+                }
+                ui.requestLandDetailsCard.innerHTML = landDetailsHTML;
+
+                const tableBody = ui.requestsForLandTableBody;
+                tableBody.innerHTML = '';
+                if (requests.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-500">لا توجد طلبات لهذه الأرض.</td></tr>`; }
+                else {
+                    requests.forEach(req => {
+                        const investor = investors[req.investorId];
+                        const statusClasses = { pending: 'bg-yellow-100 text-yellow-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800', attachment_rejected: 'bg-orange-100 text-orange-800', awarded: 'bg-purple-100 text-purple-800' };
+                        const statusText = { pending: 'قيد المراجعة', approved: 'مقبول', rejected: 'مرفوض', attachment_rejected: 'مرفق مرفوض', awarded: 'تم التخصيص' };
+                        
+                        let auctionQualificationHtml = '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>';
+                        if (offering.mechanism === 'auction') {
+                            const initialInsurance = req.feesPaid.find(f => f.item === 'التأمين الابتدائي');
+                            const isQualified = initialInsurance && initialInsurance.status === 'paid';
+                            if (isQualified) {
+                                auctionQualificationHtml = '<td class="px-6 py-4 whitespace-nowrap text-sm"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">مؤهل</span></td>';
+                            } else {
+                                auctionQualificationHtml = '<td class="px-6 py-4 whitespace-nowrap text-sm"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">غير مؤهل</span></td>';
+                            }
+                        }
+
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-gray-50";
+                        tr.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${investor.name}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${req.requestDate}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[req.status]}">${statusText[req.status] || req.status}</span></td>
+                            ${auctionQualificationHtml}
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4 space-x-reverse">
+                                <button class="view-single-request-btn text-indigo-600 hover:text-indigo-900" data-request-id="${req.requestId}">عرض الطلب</button>
+                                <button class="view-investor-btn text-gray-600 hover:text-gray-900" data-investor-id="${req.investorId}">تفاصيل المستثمر</button>
+                            </td>`;
+                        tableBody.appendChild(tr);
+                    });
+                }
+                renderAllocationCard(landInOffering, requests);
+            }
+
+            function renderAllocationCard(landInOffering, requests) {
+                const container = ui.allocationCardContainer;
+                container.classList.remove('hidden');
+                const cardTitle = 'بطاقة تسجيل قرار التخصيص';
+                if (landInOffering.awardDetails) {
+                    const winnerRequest = landRequestsData.find(r => r.requestId === landInOffering.awardDetails.awardedToRequestId);
+                    const winner = investors[winnerRequest.investorId];
+                    container.innerHTML = `<h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">${cardTitle}</h3><div class="space-y-4 text-sm"><div><p class="font-medium text-gray-500">تم التخصيص لـ</p><p class="font-bold text-lg text-green-700">${winner.name}</p></div><div><p class="font-medium text-gray-500">سعر الفدان بعد المزاد</p><p class="text-gray-800 font-bold">${formatCurrency(landInOffering.awardDetails.finalPricePerFeddans)}</p></div><div><p class="font-medium text-gray-500">تاريخ استلام الأرض</p><p class="text-gray-800">${new Date(landInOffering.awardDetails.handoverDate).toLocaleDateString('ar-EG')}</p></div><div><p class="font-medium text-gray-500">محضر الاستلام</p><a href="#" class="text-blue-600 hover:underline">${landInOffering.awardDetails.handoverFileName}</a></div><div class="pt-4 border-t"><p class="font-medium text-gray-500">تأشيرة المحافظ</p><p class="text-gray-800 bg-gray-50 p-3 rounded-md mt-1">${landInOffering.awardDetails.governorNotes}</p></div></div>`;
+                } else {
+                    container.innerHTML = `<h3 class="text-lg font-semibold text-gray-800 border-b pb-3 mb-6">${cardTitle}</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end"><div class="md:col-span-2"><label for="awarded-to-select" class="block mb-2 text-sm font-medium text-gray-700">المرشح للتخصيص</label><select id="awarded-to-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"><option selected disabled value="">-- اختر اسم المستثمر --</option></select></div><div><button id="save-award-btn" class="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700 disabled:bg-gray-400" disabled>حفظ</button></div></div><div id="award-details-fields" class="hidden mt-6 pt-6 border-t grid grid-cols-1 md:grid-cols-2 gap-6"><div><label for="handover-date-input" class="block mb-2 text-sm font-medium text-gray-700">تاريخ استلام الأرض</label><input type="date" id="handover-date-input" class="bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5"></div><div><label for="handover-file-input" class="block mb-2 text-sm font-medium text-gray-700">إرفاق محضر الاستلام</label><input type="file" id="handover-file-input" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"></div></div>`;
+                    const awardedToSelect = document.getElementById('awarded-to-select');
+                    requests.forEach(req => awardedToSelect.add(new Option(investors[req.investorId].name, req.requestId)));
+                }
+            }
+            
+            function renderSingleRequestDetailsView(requestId) {
+                currentRequestIdForView = requestId;
+                showView('single-request-details-view');
+                const request = landRequestsData.find(r => r.requestId === requestId);
+                if (!request) return;
+                const investor = investors[request.investorId];
+                const offering = offeringsList.find(o => o.lands.some(l => l.landId === request.landId));
+                const mechanism = offering ? offering.mechanism : null;
+                const statusClasses = { pending: 'bg-yellow-100 text-yellow-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800', attachment_rejected: 'bg-orange-100 text-orange-800', awarded: 'bg-purple-100 text-purple-800' };
+                const statusText = { pending: 'قيد المراجعة', approved: 'مقبول', rejected: 'مرفوض', attachment_rejected: 'مرفق مرفوض', awarded: 'تم التخصيص' };
+                ui.applicantDetailsCard.innerHTML = `<div><span class="font-semibold text-gray-600">اسم مقدم الطلب:</span><p class="text-gray-800">${investor.name}</p></div><div><span class="font-semibold text-gray-600">تاريخ الطلب:</span><p class="text-gray-800">${request.requestDate}</p></div><div><span class="font-semibold text-gray-600">الحالة:</span><p><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[request.status]}">${statusText[request.status] || request.status}</span></p></div>${request.finalPrice ? `<div><span class="font-semibold text-gray-600">السعر النهائي المقدم:</span><p class="text-gray-800">${formatCurrency(request.finalPrice, 'EGP')}</p></div>` : ''}${request.rejectionReason ? `<div><span class="font-semibold text-gray-600">سبب الرفض:</span><p class="text-red-600">${request.rejectionReason}</p></div>` : ''}`;
+                ui.proposedProjectText.textContent = request.proposedProject || 'لا يوجد وصف للمشروع.';
+                renderFeesPaid(request, offering.currency);
+                renderLandAttachments(request);
+                renderAuctionStatus(request, mechanism);
+                renderRequestActions(request);
+                renderLog(request, ui.requestLogContainer, landWorkflowSteps);
+                renderWorkflow(request.workflowStage, request.status, ui.requestWorkflowContainer, landWorkflowSteps);
+            }
+
+            function renderRequestActions(request) {
+                const container = ui.requestActionsContainer;
+                container.innerHTML = '';
+                if (request.status === 'awarded' || request.status === 'rejected') {
+                    container.innerHTML = '<p class="text-sm text-center text-gray-500">لا توجد إجراءات متاحة لهذا الطلب.</p>';
+                    return;
+                }
+                let buttonsHTML = `<button id="approve-request-btn" class="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>موافقة واستكمال سير العمل</button>`;
+                buttonsHTML += `<button id="send-payment-requests-btn" class="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>إرسال طلبات دفع</button><button id="request-additional-attachment-btn" class="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg shadow-sm hover:bg-gray-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>طلب مرفق إضافي</button>`;
+                buttonsHTML += `<button id="reject-request-btn" class="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>رفض الطلب</button>`;
+                container.innerHTML = buttonsHTML;
+            }
+
+            function renderFeesPaid(request, currency) {
+                 const container = ui.feesPaidContainer;
+                 if (!request.feesPaid || request.feesPaid.length === 0) { container.innerHTML = `<p class="text-sm text-gray-500">لم يتم دفع أي رسوم بعد.</p>`; return; }
+                 let tableHTML = `<table class="min-w-full text-sm"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-right font-medium text-gray-600">البند</th><th class="px-4 py-2 text-right font-medium text-gray-600">المبلغ</th><th class="px-4 py-2 text-right font-medium text-gray-600">الحالة</th><th class="px-4 py-2 text-right font-medium text-gray-600">الإجراءات</th></tr></thead><tbody class="divide-y divide-gray-200">`;
+                request.feesPaid.forEach((fee, index) => { const isPaid = fee.status === 'paid'; const statusClass = isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'; const statusText = isPaid ? 'مدفوع' : 'مستحق'; let actionHTML = 'لا يوجد'; if (!isPaid) { if (fee.history.length > 0) { const lastReminder = fee.history[fee.history.length - 1]; actionHTML = `<div class="text-xs text-gray-500">تم التنبيه: ${new Date(lastReminder.date).toLocaleDateString('ar-EG')}<br>بواسطة: ${lastReminder.user}</div>`; } else { actionHTML = `<button class="send-reminder-btn text-sm text-blue-600 hover:underline" data-fee-index="${index}">إعادة تنبيه</button>`; } } tableHTML += `<tr><td class="px-4 py-3">${fee.item}</td><td class="px-4 py-3">${formatCurrency(fee.amount, currency)}</td><td class="px-4 py-3"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span></td><td class="px-4 py-3">${actionHTML}</td></tr>`; });
+                 container.innerHTML = tableHTML + `</tbody></table>`;
+            }
+
+            function renderLandAttachments(request) {
+                const attachmentsList = ui.attachmentsList;
+                attachmentsList.innerHTML = '';
+                if (!request.attachments || request.attachments.length === 0) { attachmentsList.innerHTML = `<li class="text-sm text-gray-500">لا توجد مرفقات.</li>`; return; }
+                request.attachments.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 bg-gray-50 rounded-lg flex items-center justify-between flex-wrap gap-2';
+                    let statusBadge, actionButtons;
+                    if (file.status === 'verified') { statusBadge = `<span class="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">تم التحقق</span>`; actionButtons = `<button class="view-attachment-btn text-sm text-blue-600 hover:underline" data-filename="${file.name}">عرض</button>`; }
+                    else if (file.status === 'rejected') { statusBadge = `<span class="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">مرفوض</span>`; actionButtons = file.resubmissionRequestedOn ? `<div class="text-xs text-gray-500">تم طلب إعادة الإرسال بتاريخ ${new Date(file.resubmissionRequestedOn).toLocaleDateString('ar-EG')}</div>` : `<button class="resend-request-btn text-sm text-orange-600 hover:underline" data-request-id="${request.requestId}" data-attachment-index="${index}">طلب إعادة إرسال</button>`; }
+                    else if (file.status === 'required') { statusBadge = `<span class="text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-1 rounded-full">مطلوب</span>`; actionButtons = `<span>في انتظار الرفع</span>`; }
+                    else { statusBadge = `<span class="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">قيد المراجعة</span>`; actionButtons = `<button class="view-attachment-btn text-sm text-blue-600 hover:underline" data-filename="${file.name}">عرض</button><button data-request-id="${request.requestId}" data-attachment-index="${index}" class="verify-attachment-btn text-sm text-green-600 hover:underline">قبول</button><button data-request-id="${request.requestId}" data-attachment-index="${index}" class="reject-attachment-btn text-sm text-red-600 hover:underline">رفض</button>`; }
+                    li.innerHTML = `<div class="flex items-center"><svg class="w-4 h-4 ml-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg><span class="text-gray-800 font-medium">${file.name}</span></div><div class="flex items-center space-x-3 space-x-reverse">${statusBadge}${actionButtons}</div>`;
+                    attachmentsList.appendChild(li);
+                });
+            }
+            
+            function renderAuctionStatus(request, mechanism) { const container = ui.auctionStatusContainer; if (mechanism !== 'auction') { container.innerHTML = ''; return; } const initialInsurance = request.feesPaid.find(f => f.item === 'التأمين الابتدائي'); const isPaid = initialInsurance && initialInsurance.status === 'paid'; const statusText = isPaid ? 'مؤهل لدخول المزاد' : 'غير مؤهل لدخول المزاد'; const bgColor = isPaid ? 'bg-green-100' : 'bg-red-100'; const textColor = isPaid ? 'text-green-800' : 'text-red-800'; const icon = isPaid ? `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>` : `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`; container.innerHTML = `<div class="p-4 rounded-xl ${bgColor} ${textColor} flex items-center"><div class="flex-shrink-0">${icon}</div><div class="mr-3"><p class="font-bold">${statusText}</p><p class="text-sm">${isPaid ? 'تم دفع التأمين الابتدائي بنجاح.' : 'يجب دفع التأمين الابتدائي أولاً.'}</p></div></div>`; }
+            
+            // ########## "Rescheduling Requests" Rendering ##########
+            function renderReschedulingListView() {
+                showView('rescheduling-list-view');
+                const tableBody = ui.reschedulingListBody;
+                tableBody.innerHTML = '';
+                const statusClasses = { draft: 'status-draft', submitted: 'status-submitted', review: 'status-review', approved: 'status-approved', rejected: 'status-rejected', completed: 'status-approved' };
+                const statusText = { draft: 'مسودة', submitted: 'تم الإرسال', review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', completed: 'مكتمل' };
+
+                reschedulingRequestsData.forEach(req => {
+                    const investor = investors[req.investorId];
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">${investor.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${req.contractId}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${req.requestDate}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">${formatCurrency(req.totalDue, 'EGP')}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm"><span class="status-badge ${statusClasses[req.status]}">${statusText[req.status]}</span></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button class="view-rescheduling-details-btn text-indigo-600 hover:text-indigo-900" data-id="${req.id}">عرض التفاصيل</button>
+                        </td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            function renderReschedulingDetailsView(requestId) {
+                currentReschedulingRequestId = requestId;
+                showView('rescheduling-details-view');
+                const request = reschedulingRequestsData.find(r => r.id === requestId);
+                if (!request) return;
+                
+                const investor = investors[request.investorId];
+                ui.reschedulingDetailsId.textContent = request.id;
+
+                renderWorkflow(request.workflowStage, request.status, ui.reschedulingWorkflowContainer, reschedulingWorkflowSteps);
+
+                const statusClasses = { draft: 'status-draft', submitted: 'status-submitted', review: 'status-review', approved: 'status-approved', rejected: 'status-rejected', completed: 'status-approved' };
+                const statusText = { draft: 'مسودة', submitted: 'تم الإرسال', review: 'قيد المراجعة', approved: 'معتمد', rejected: 'مرفوض', completed: 'مكتمل' };
+                
+                const editButton = document.getElementById('edit-rescheduling-btn');
+                editButton.textContent = request.status === 'submitted' ? 'إضافة جدولة' : 'تعديل';
+                editButton.classList.toggle('hidden', isReschedulingInEditMode || request.status === 'approved' || request.status === 'completed');
+                ui.reschedulingSaveBtnContainer.classList.toggle('hidden', !isReschedulingInEditMode);
+
+                ui.reschedulingGeneralDetailsCard.innerHTML = `
+                    <div><label class="block font-medium text-gray-500">اسم المستثمر</label><p class="mt-1 text-gray-800 font-semibold">${investor.name}</p></div>
+                    <div><label class="block font-medium text-gray-500">الرقم القومي / السجل التجاري</label><p class="mt-1 text-gray-800 font-semibold">${investor.nationalId}</p></div>
+                    <div><label class="block font-medium text-gray-500">رقم العقد / المشروع</label><p class="mt-1 text-gray-800 font-semibold">${request.contractId}</p></div>
+                    <div><label class="block font-medium text-gray-500">إجمالي المبالغ المستحقة</label><p class="mt-1 text-red-600 font-bold text-base">${formatCurrency(request.totalDue)}</p></div>
+                    <div><label class="block font-medium text-gray-500">عدد الأيام المتأخرة</label><p class="mt-1 text-gray-800 font-semibold">${request.daysOverdue} يوم</p></div>
+                    <div><label class="block font-medium text-gray-500">حالة الطلب</label><p class="mt-1"><span class="status-badge ${statusClasses[request.status]}">${statusText[request.status]}</span></p></div>
+                `;
+
+                const disabledAttr = isReschedulingInEditMode ? '' : 'disabled';
+                ui.reschedulingRequestDetailsCard.innerHTML = `
+                    <div class="space-y-4">
+                        <div><label class="block font-medium text-gray-500">سبب طلب الجدولة (من المستثمر)</label><p class="mt-1 text-gray-700 bg-gray-50 p-2 rounded-md">${request.reason}</p></div>
+                        <div><label for="rescheduling-start-date" class="block font-medium text-gray-700">تاريخ بداية الجدولة</label><input type="date" id="rescheduling-start-date" class="mt-1 bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" value="${request.proposedStartDate}" ${disabledAttr}></div>
+                        <div><label for="rescheduling-installments-count" class="block font-medium text-gray-700">عدد الأقساط</label><input type="number" id="rescheduling-installments-count" class="mt-1 bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" value="${request.installmentsCount}" ${disabledAttr}></div>
+                        <div>
+                            <label class="block font-medium text-gray-700">هل تطبق الغرامة؟</label>
+                            <div class="flex items-center space-x-4 space-x-reverse mt-2">
+                                <div class="flex items-center"><input id="penalty-exemption-yes-rs" name="penalty-exemption-rs" type="radio" value="yes" class="h-4 w-4 border-gray-300 text-indigo-600" ${request.penaltyApplied ? 'checked' : ''} ${disabledAttr}><label for="penalty-exemption-yes-rs" class="ml-2 mr-2 block text-sm text-gray-900">نعم</label></div>
+                                <div class="flex items-center"><input id="penalty-exemption-no-rs" name="penalty-exemption-rs" type="radio" value="no" class="h-4 w-4 border-gray-300 text-indigo-600" ${!request.penaltyApplied ? 'checked' : ''} ${disabledAttr}><label for="penalty-exemption-no-rs" class="ml-2 mr-2 block text-sm text-gray-900">لا</label></div>
+                            </div>
+                        </div>
+                        <div class="${request.penaltyApplied ? '' : 'hidden'}" id="penalty-amount-container-rs">
+                            <label for="rescheduling-penalty-amount" class="block font-medium text-gray-700">مبلغ الغرامة</label>
+                            <input type="number" id="rescheduling-penalty-amount" class="mt-1 bg-gray-50 border border-gray-300 text-sm rounded-lg block w-full p-2.5" value="${request.penaltyAmount}" ${disabledAttr}>
+                        </div>
+                    </div>
+                `;
+                
+                renderReschedulingAttachments(request);
+                renderReschedulingActions(request);
+                updateReschedulingPaymentPlan();
+                renderLog(request, ui.reschedulingLogContainer, reschedulingWorkflowSteps);
+            }
+            
+            function updateReschedulingPaymentPlan() {
+                const request = reschedulingRequestsData.find(r => r.id === currentReschedulingRequestId);
+                if (!request) return;
+
+                const container = ui.reschedulingPaymentPlanContainer;
+                const penaltyYesRadio = document.getElementById('penalty-exemption-yes-rs');
+                const penaltyAmountInput = document.getElementById('rescheduling-penalty-amount');
+                const installmentsCountInput = document.getElementById('rescheduling-installments-count');
+                const startDateInput = document.getElementById('rescheduling-start-date');
+
+                let totalAmount = request.totalDue;
+                if (penaltyYesRadio && penaltyYesRadio.checked) {
+                    const penaltyAmount = parseFloat(penaltyAmountInput.value) || 0;
+                    totalAmount += penaltyAmount;
+                }
+
+                const installmentsCount = parseInt(installmentsCountInput.value) || request.installmentsCount;
+                if(installmentsCount <= 0) return;
+
+                const valuePerInstallment = totalAmount / installmentsCount;
+                const startDate = new Date(startDateInput.value || request.proposedStartDate);
+                
+                let tableHTML = `<table class="min-w-full"><thead class="bg-gray-50"><tr><th class="px-4 py-2 text-right text-sm font-medium text-gray-600">رقم القسط</th><th class="px-4 py-2 text-right text-sm font-medium text-gray-600">تاريخ الاستحقاق</th><th class="px-4 py-2 text-right text-xs font-medium text-gray-600">قيمة القسط</th></tr></thead><tbody>`;
+                
+                for (let i = 1; i <= installmentsCount; i++) {
+                    const dueDate = new Date(startDate);
+                    dueDate.setMonth(dueDate.getMonth() + (i - 1));
+                    tableHTML += `<tr>
+                        <td class="px-4 py-2 text-sm text-gray-800">${i}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${dueDate.toLocaleDateString('ar-EG')}</td>
+                        <td class="px-4 py-2 text-sm text-gray-800 font-semibold">${formatCurrency(valuePerInstallment)}</td>
+                    </tr>`;
+                }
+                tableHTML += `</tbody></table>`;
+                container.innerHTML = tableHTML;
+            }
+
+            function renderReschedulingAttachments(request) {
+                const list = ui.reschedulingAttachmentsList;
+                list.innerHTML = '';
+                if (!request.attachments || request.attachments.length === 0) { list.innerHTML = `<li class="text-sm text-gray-500">لا توجد مرفقات.</li>`; return; }
+                request.attachments.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'p-3 bg-gray-50 rounded-lg flex items-center justify-between flex-wrap gap-2';
+                    let statusBadge, actionButtons = '';
+                    if (file.status === 'verified') { statusBadge = `<span class="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">تم التحقق</span>`; actionButtons = `<button class="view-attachment-btn text-sm text-blue-600 hover:underline" data-filename="${file.name}">عرض</button>`; }
+                    else if (file.status === 'rejected') { statusBadge = `<span class="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">مرفوض</span>`; actionButtons = `<button class="resend-rescheduling-attachment-btn text-sm text-orange-600 hover:underline" data-request-id="${request.id}" data-attachment-index="${index}">طلب إعادة إرسال</button>`; }
+                    else if (file.status === 'required') { statusBadge = `<span class="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">مطلوب</span>`; actionButtons = `<span>في انتظار الرفع</span>`; }
+                    else { statusBadge = `<span class="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">قيد المراجعة</span>`; actionButtons = `<button class="view-attachment-btn text-sm text-blue-600 hover:underline" data-filename="${file.name}">عرض</button><button data-request-id="${request.id}" data-attachment-index="${index}" class="verify-rescheduling-attachment-btn text-sm text-green-600 hover:underline">قبول</button><button data-request-id="${request.id}" data-attachment-index="${index}" class="reject-rescheduling-attachment-btn text-sm text-red-600 hover:underline">رفض</button>`; }
+                    li.innerHTML = `<div class="flex items-center"><svg class="w-4 h-4 ml-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg><span class="text-gray-800 font-medium">${file.name}</span></div><div class="flex items-center space-x-3 space-x-reverse">${statusBadge}${actionButtons}</div>`;
+                    list.appendChild(li);
+                });
+            }
+
+            function renderReschedulingActions(request) {
+                const container = ui.reschedulingActionsContainer;
+                container.innerHTML = '';
+                if (request.status === 'approved' || request.status === 'rejected' || request.status === 'completed') {
+                    container.innerHTML = '<p class="text-sm text-center text-gray-500">لا توجد إجراءات متاحة لهذا الطلب.</p>';
+                    return;
+                }
+                let buttonsHTML = `<button id="approve-rescheduling-btn" class="w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>موافقة واستكمال سير العمل</button>`;
+                buttonsHTML += `<button id="request-rescheduling-attachment-btn" class="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg shadow-sm hover:bg-gray-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>طلب مرفق إضافي</button>`;
+                buttonsHTML += `<button id="reject-rescheduling-btn" class="w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>رفض الطلب</button>`;
+                container.innerHTML = buttonsHTML;
+            }
+
+
+            // ########## "Other Requests" Rendering ##########
+            function renderOtherRequestsSummaryView() { showView('other-requests-view'); const tableBody = ui.otherRequestsSummaryTableBody; tableBody.innerHTML = ''; if (otherRequestsData.length === 0) { tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">لا توجد طلبات أخرى حالياً.</td></tr>`; return; } const statusClasses = { review: 'bg-yellow-100 text-yellow-800', fee_pending: 'bg-blue-100 text-blue-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800', completed: 'bg-purple-100 text-purple-800' }; otherRequestsData.forEach(req => { const investor = investors[req.investorId]; const tr = document.createElement('tr'); tr.className = "hover:bg-gray-50"; tr.innerHTML = `<td class="px-6 py-4 text-sm font-semibold text-gray-800">${req.id}</td><td class="px-6 py-4 text-sm text-gray-800">${investor.name}</td><td class="px-6 py-4 text-sm text-gray-500">${req.typeText}</td><td class="px-6 py-4 text-sm text-gray-500">${req.date}</td><td class="px-6 py-4 text-sm"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[req.status]}">${req.statusText}</span></td><td class="px-6 py-4 text-sm font-medium"><button class="view-other-request-btn text-indigo-600 hover:text-indigo-900" data-request-id="${req.id}">عرض التفاصيل</button></td>`; tableBody.appendChild(tr); }); }
+            function renderOtherRequestDetailsView(requestId) { currentOtherRequestId = requestId; showView('other-request-details-view'); const request = otherRequestsData.find(r => r.id === requestId); if (!request) return; const investor = investors[request.investorId]; ui.otherRequestDetailsId.textContent = requestId; const statusClasses = { review: 'bg-yellow-100 text-yellow-800', fee_pending: 'bg-blue-100 text-blue-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-red-100 text-red-800', completed: 'bg-purple-100 text-purple-800' }; ui.otherRequestApplicantCard.innerHTML = `<div><span class="font-semibold text-gray-600">اسم مقدم الطلب:</span><p class="text-gray-800">${investor.name}</p></div><div><span class="font-semibold text-gray-600">نوع الطلب:</span><p class="text-gray-800">${request.typeText}</p></div><div><span class="font-semibold text-gray-600">تاريخ الطلب:</span><p class="text-gray-800">${request.date}</p></div><div><span class="font-semibold text-gray-600">الحالة:</span><p><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClasses[request.status]}">${request.statusText}</span></p></div>`; ui.otherRequestDescriptionText.textContent = request.description; renderOtherRequestAttachments(request); renderOtherRequestFees(request); renderOtherRequestGovernorDecision(request); renderOtherRequestActions(request); renderWorkflow(request.workflowStage, request.status, ui.otherRequestWorkflowContainer, otherRequestWorkflowSteps); renderLog(request, ui.otherRequestLogContainer, otherRequestWorkflowSteps); }
+            function renderOtherRequestAttachments(request) { const list = ui.otherRequestAttachmentsList; list.innerHTML = ''; if (!request.attachments || request.attachments.length === 0) { list.innerHTML = `<li class="text-sm text-gray-500">لا توجد مرفقات.</li>`; return; } request.attachments.forEach((file, index) => { const li = document.createElement('li'); li.className = 'p-3 bg-gray-50 rounded-lg flex items-center justify-between flex-wrap gap-2'; let statusBadge, actionButtons = ''; if (file.status === 'verified') statusBadge = `<span class="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">تم التحقق</span>`; else if (file.status === 'rejected') statusBadge = `<span class="text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">مرفوض</span>`; else if (file.status === 'required') statusBadge = `<span class="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">مطلوب</span>`; else if (file.status === 'resubmission_requested') statusBadge = `<span class="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">مطلوب إعادة إرساله</span>`; else { statusBadge = `<span class="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">قيد المراجعة</span>`; actionButtons = `<button data-index="${index}" class="other-verify-attachment-btn text-sm text-green-600 hover:underline">قبول</button><button data-index="${index}" class="other-reject-attachment-btn text-sm text-red-600 hover:underline">رفض</button>`; } if (file.status === 'rejected' && !file.resubmissionRequestedOn) actionButtons = `<button data-index="${index}" class="other-resend-request-btn text-sm text-orange-600 hover:underline">طلب إعادة إرسال</button>`; if(file.resubmissionRequestedOn) actionButtons += `<div class="text-xs text-gray-500 w-full text-left mt-1">تم طلب الإعادة بتاريخ ${new Date(file.resubmissionRequestedOn).toLocaleDateString('ar-EG')}</div>`; li.innerHTML = `<div class="flex items-center"><svg class="w-4 h-4 ml-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg><span class="text-gray-800 font-medium">${file.name}</span></div><div class="flex items-center space-x-3 space-x-reverse">${statusBadge}${actionButtons}</div>`; list.appendChild(li); }); }
+            function renderOtherRequestFees(request) { const container = ui.otherRequestFeesContainer; if (!request.fees) { container.innerHTML = `<p class="text-sm text-gray-500">لا توجد رسوم مطلوبة حالياً.</p>`; return; } let installmentsHTML = ''; if (request.fees.paymentMethod === 'installments') { installmentsHTML = '<h4 class="text-sm font-semibold mt-4 mb-2">تفاصيل الأقساط:</h4><ul class="space-y-2">'; request.fees.installments.forEach((inst, index) => { const isPaid = inst.status === 'paid'; installmentsHTML += `<li class="flex justify-between items-center text-sm p-2 rounded-md ${isPaid ? 'bg-green-50' : 'bg-gray-50'}"><span>القسط ${index + 1}: ${formatCurrency(inst.amount)}</span><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${isPaid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">${isPaid ? 'مدفوع' : 'مستحق'}</span></li>`; }); installmentsHTML += '</ul>'; } container.innerHTML = `<div class="space-y-2"><div><span class="font-semibold text-gray-600">بيان الرسوم:</span><p class="text-gray-800">${request.fees.name}</p></div><div><span class="font-semibold text-gray-600">المبلغ الإجمالي:</span><p class="text-gray-800 font-bold">${formatCurrency(request.fees.totalAmount)}</p></div><div><span class="font-semibold text-gray-600">طريقة السداد:</span><p class="text-gray-800">${request.fees.paymentMethod === 'single' ? 'دفعة واحدة' : 'أقساط'}</p></div></div>${installmentsHTML}`; }
+            function renderOtherRequestGovernorDecision(request) { const container = ui.otherRequestGovernorDecisionContainer; const decision = request.governorDecision; if (decision.approved !== null) { const decisionText = decision.approved ? 'مقبول' : 'مرفوض'; const decisionColor = decision.approved ? 'text-green-700' : 'text-red-700'; container.innerHTML = `<div><p class="font-medium text-gray-500">القرار</p><p class="font-bold text-lg ${decisionColor}">${decisionText}</p></div><div class="mt-4 pt-4 border-t"><p class="font-medium text-gray-500">التأشيرة</p><p class="text-gray-800 bg-gray-50 p-3 rounded-md mt-1">${decision.notes || 'لا توجد تأشيرة.'}</p></div>`; } else { container.innerHTML = `<p class="text-sm text-gray-500 mb-2">في انتظار قرار المحافظ.</p><textarea id="governor-notes-other-req" rows="4" class="w-full p-2 border rounded-md bg-gray-50" placeholder="اكتب تأشيرة المحافظ هنا..."></textarea><div class="mt-3 flex gap-2"><button data-decision="approved" class="governor-decision-btn w-full px-4 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700">موافقة</button><button data-decision="rejected" class="governor-decision-btn w-full px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700">رفض</button></div>`; } }
+            function renderOtherRequestActions(request) { const container = ui.otherRequestActionsContainer; container.innerHTML = ''; if (request.status === 'completed' || request.status === 'rejected') { container.innerHTML = '<p class="text-sm text-center text-gray-500">لا توجد إجراءات متاحة لهذا الطلب.</p>'; return; } if (!request.fees) container.innerHTML += `<button id="other-request-add-fee-btn" class="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01"></path></svg>طلب سداد رسوم</button>`; container.innerHTML += `<button id="other-request-add-attachment-btn" class="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg shadow-sm hover:bg-gray-700 mt-3"><svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>طلب مرفق إضافي</button>`; }
+            function renderInvestorDetailsModal(investorId) {
+                const investor = investors[investorId];
+                if (!investor) return;
+
+                document.getElementById('investor-modal-name').textContent = investor.name;
+                
+                // Investor Info (Replaces Summary)
+                const infoContainer = document.getElementById('investor-modal-info');
+                const statusColors = { 'منتظم': 'text-green-600', 'متخلف جزئيا': 'text-yellow-600', 'متخلف كليا': 'text-red-600' };
+                infoContainer.innerHTML = `
+                    <p><strong>اسم العميل:</strong> <span class="text-gray-700">${investor.name}</span></p>
+                    <p><strong>رقم الملف:</strong> <span class="text-gray-700">${investor.fileNumber || 'غير محدد'}</span></p>
+                    <p><strong>الحالة:</strong> <span class="font-bold ${statusColors[investor.status]}">${investor.status}</span></p>
+                `;
+
+                // Dues
+                const duesContainer = document.getElementById('investor-modal-dues');
+                const allRequestsForInvestor = [...landRequestsData, ...otherRequestsData].filter(r => r.investorId === investorId);
+                let totalDues = 0;
+                let duesHtml = '<ul>';
+                allRequestsForInvestor.forEach(req => {
+                    if (req.feesPaid) { // Land requests
+                        req.feesPaid.filter(f => f.status === 'pending').forEach(f => {
+                            totalDues += f.amount;
+                            duesHtml += `<li class="text-gray-700">${f.item}: ${formatCurrency(f.amount)}</li>`;
+                        });
+                    }
+                    if (req.fees && req.fees.installments) { // Other requests
+                        req.fees.installments.filter(i => i.status === 'pending').forEach(i => {
+                            totalDues += i.amount;
+                            duesHtml += `<li class="text-gray-700">قسط من ${req.fees.name}: ${formatCurrency(i.amount)}</li>`;
+                        });
+                    }
+                });
+                duesHtml += '</ul>';
+                duesContainer.innerHTML = `<p class="font-bold text-lg">${formatCurrency(totalDues)}</p>${totalDues > 0 ? duesHtml : '<p class="text-gray-700">لا توجد مستحقات حالية.</p>'}`;
+
+                // Allocated Land Details
+                const landDetailsContainer = document.getElementById('investor-modal-land-details');
+                const allocatedRequests = landRequestsData.filter(r => r.investorId === investorId && r.status === 'awarded');
+                if (allocatedRequests.length > 0) {
+                    const allocated = allocatedRequests[0]; // Displaying details for the first allocated land
+                    const land = availableLands.find(l => l.id === allocated.landId);
+                    
+                    landDetailsContainer.innerHTML = `
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <div><strong>آلية التعامل:</strong> <p class="text-gray-700">${allocated.awardDetails.mechanism === 'auction' ? 'مزاد علني' : 'غير محدد'}</p></div>
+                            <div><strong>تاريخ المزاد:</strong> <p class="text-gray-700">${allocated.awardDetails.auctionDate || 'غير محدد'}</p></div>
+                            <div><strong>رقم المزاد/المبادرة:</strong> <p class="text-gray-700">${allocated.awardDetails.auctionNumber || 'غير محدد'}</p></div>
+                            <div><strong>تاريخ استلام الأرض:</strong> <p class="text-gray-700">${allocated.awardDetails.handoverDate || 'غير محدد'}</p></div>
+                            <div><strong>فترة الإعفاء:</strong> <p class="text-gray-700">${allocated.awardDetails.exemptionPeriod || 'غير محدد'}</p></div>
+                            <div><strong>المركز التابع لها:</strong> <p class="text-gray-700">${land.center || 'غير محدد'}</p></div>
+                            <div class="sm:col-span-2"><strong>موقع الأرض:</strong> <p class="text-gray-700">${land.village || 'غير محدد'}</p></div>
+                            <div><strong>المساحة:</strong> <p class="text-gray-700">${land.areaFeddans} فدان</p></div>
+                        </div>
+                    `;
+                } else {
+                    landDetailsContainer.innerHTML = '<p class="text-gray-700">لا توجد أراضي مخصصة حالياً.</p>';
+                }
+
+                // Submitted Requests
+                const requestsContainer = document.getElementById('investor-modal-requests');
+                 if (allRequestsForInvestor.length > 0) {
+                    requestsContainer.innerHTML = allRequestsForInvestor.map(r => `<p class="text-gray-700">- طلب ${r.requestId ? `تخصيص أرض ${r.landId}` : `أخرى (${r.typeText})`} بتاريخ ${r.requestDate || r.date}</p>`).join('');
+                } else {
+                    requestsContainer.innerHTML = '<p class="text-gray-700">لا توجد طلبات مقدمة.</p>';
+                }
+
+                ui.investorDetailsModal.classList.remove('hidden');
+            }
+
+            // ########## Event Handlers & Logic ##########
+            function handleAttachmentRejection() {
+                if (!currentAttachmentForRejection) return;
+                const reason = document.getElementById('rejection-reason-text').value;
+                if (!reason.trim()) {
+                    showToast('سبب الرفض حقل إلزامي', false);
+                    return;
+                }
+                const { type, requestId, attachmentIndex } = currentAttachmentForRejection;
+                let request;
+                let renderFunction;
+
+                if (type === 'land') {
+                    request = landRequestsData.find(r => r.requestId === requestId);
+                    renderFunction = () => renderSingleRequestDetailsView(requestId);
+                } else if (type === 'other') {
+                    request = otherRequestsData.find(r => r.id === requestId);
+                    renderFunction = () => renderOtherRequestDetailsView(requestId);
+                } else if (type === 'rescheduling') {
+                    request = reschedulingRequestsData.find(r => r.id === requestId);
+                    renderFunction = () => renderReschedulingDetailsView(requestId);
+                }
+
+                if (request) {
+                    if (attachmentIndex !== undefined && request.attachments && request.attachments[attachmentIndex]) {
+                        const attachment = request.attachments[attachmentIndex];
+                        attachment.status = 'rejected';
+                        attachment.rejectionReason = reason;
+                        if(type !== 'rescheduling') request.status = 'attachment_rejected'; // Avoid changing main status for rescheduling
+                        request.log.push({ type: 'attachment_status', user: 'مدير النظام', date: new Date().toISOString(), status: 'rejected', fileName: attachment.name, reason: reason });
+                    } else { // Rejecting the whole request
+                        request.status = 'rejected';
+                        request.rejectionReason = reason;
+                        request.log.push({ type: 'note', user: 'مدير النظام', date: new Date().toISOString(), note: `تم رفض الطلب. السبب: ${reason}` });
+                    }
+                    renderFunction();
+                }
+
+                ui.rejectReasonModal.classList.add('hidden');
+                document.getElementById('rejection-reason-text').value = '';
+                currentAttachmentForRejection = null;
+            }
+            function handleAddFee() { const request = otherRequestsData.find(r => r.id === currentOtherRequestId); if (!request) return; const feeName = document.getElementById('fee-name-input').value; const totalAmount = parseFloat(document.getElementById('fee-amount-input').value); const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value; if (!feeName || !totalAmount) { showToast('الرجاء إدخال بيان الرسوم والمبلغ', false); return; } const newFee = { name: feeName, totalAmount, paymentMethod, installments: [] }; if (paymentMethod === 'installments') { const count = parseInt(document.getElementById('installments-count-input').value); if (!count || count < 2) { showToast('الرجاء إدخال عدد أقساط صحيح (2 أو أكثر)', false); return; } const installmentAmount = Math.round((totalAmount / count) * 100) / 100; for(let i = 0; i < count; i++) newFee.installments.push({ amount: i === count - 1 ? totalAmount - (installmentAmount * (count - 1)) : installmentAmount, dueDate: `2025-${8+i}-15`, status: 'pending' }); } request.fees = newFee; request.status = 'fee_pending'; request.statusText = 'في انتظار سداد الرسوم'; request.workflowStage = 'fee_payment'; request.log.push({type: 'fee_request', user: 'مدير النظام', date: new Date().toISOString(), feeName: feeName, amount: totalAmount}); renderOtherRequestDetailsView(request.id); ui.addFeeModal.classList.add('hidden'); showToast('تمت إضافة الرسوم بنجاح.'); }
+            function handleRequestOtherAttachment() { const request = otherRequestsData.find(r => r.id === currentOtherRequestId); if (!request) return; const attachmentName = document.getElementById('other-attachment-name-input').value.trim(); if (!attachmentName) { showToast('الرجاء إدخال اسم المرفق المطلوب', false); return; } request.attachments.push({ name: attachmentName, status: 'required' }); request.log.push({type: 'attachment_request', user: 'مدير النظام', date: new Date().toISOString(), fileName: attachmentName}); renderOtherRequestDetailsView(request.id); ui.requestOtherAttachmentModal.classList.add('hidden'); showToast('تم إرسال طلب المرفق بنجاح.'); }
+            function handleGovernorDecision(decision) { const request = otherRequestsData.find(r => r.id === currentOtherRequestId); if (!request) return; const notes = document.getElementById('governor-notes-other-req').value.trim(); if (!notes) { showToast('يرجى كتابة تأشيرة المحافظ أولاً.', false); return; } const isApproved = decision === 'approved'; request.governorDecision = { approved: isApproved, notes: notes }; request.status = isApproved ? 'completed' : 'rejected'; request.statusText = isApproved ? 'مكتمل' : 'مرفوض'; request.workflowStage = 'completed'; request.log.push({type: 'governor_decision', user: 'المحافظ', date: new Date().toISOString(), decision: decision, notes: notes}); renderOtherRequestDetailsView(request.id); showToast(`تم ${isApproved ? 'قبول' : 'رفض'} الطلب بنجاح.`); }
+            
+            // ########## Event Listeners Initialization ##########
+            function initializeEventListeners() {
+                ui.sidebar.addEventListener('click', e => { 
+                    e.preventDefault(); 
+                    const link = e.target.closest('.sidebar-link'); 
+                    if (!link) return; 
+                    ui.sidebar.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active')); 
+                    link.classList.add('active'); 
+                    if (link.id === 'nav-land-requests') renderRequestsSummaryView(); 
+                    else if (link.id === 'nav-other-requests') renderOtherRequestsSummaryView(); 
+                    else if (link.id === 'nav-rescheduling-requests') renderReschedulingListView();
+                });
+                
+                document.body.addEventListener('click', e => { 
+                    const target = e.target; 
+                    if (target.matches('.view-requests-btn')) renderRequestDetailsView(parseInt(target.dataset.landId, 10)); 
+                    if (target.matches('.view-single-request-btn')) renderSingleRequestDetailsView(target.dataset.requestId); 
+                    if (target.matches('.view-investor-btn')) renderInvestorDetailsModal(target.dataset.investorId); 
+                    if (target.matches('.reject-attachment-btn')) { currentAttachmentForRejection = { type: 'land', requestId: target.dataset.requestId, attachmentIndex: parseInt(target.dataset.attachmentIndex, 10) }; ui.rejectReasonModal.querySelector('h3').textContent = 'سبب رفض المرفق'; ui.rejectReasonModal.classList.remove('hidden'); document.getElementById('rejection-reason-text').value = ''; } 
+                    if (target.matches('#reject-request-btn')) { currentAttachmentForRejection = { type: 'land', requestId: currentRequestIdForView }; ui.rejectReasonModal.querySelector('h3').textContent = 'سبب رفض الطلب'; ui.rejectReasonModal.classList.remove('hidden'); document.getElementById('rejection-reason-text').value = ''; } 
+                    if (target.matches('.verify-attachment-btn')) { const request = landRequestsData.find(r => r.requestId === target.dataset.requestId); if(request) { const att = request.attachments[target.dataset.attachmentIndex]; att.status = 'verified'; request.log.push({type: 'attachment_status', user: 'مدير النظام', date: new Date().toISOString(), status: 'verified', fileName: att.name}); renderSingleRequestDetailsView(target.dataset.requestId); } } 
+                    if (target.matches('.resend-request-btn')) { const request = landRequestsData.find(r => r.requestId === target.dataset.requestId); if (request) { request.attachments[target.dataset.attachmentIndex].resubmissionRequestedOn = new Date().toISOString(); renderSingleRequestDetailsView(target.dataset.requestId); showToast('تم تسجيل طلب إعادة الإرسال.'); } } 
+                    if (target.matches('.send-reminder-btn')) { const request = landRequestsData.find(r => r.requestId === currentRequestIdForView); if(request && request.feesPaid[target.dataset.feeIndex]) { const fee = request.feesPaid[target.dataset.feeIndex]; fee.history.push({ user: 'مدير النظام', date: new Date().toISOString() }); request.log.push({type: 'payment_reminder', user: 'مدير النظام', date: new Date().toISOString(), feeItem: fee.item}); renderSingleRequestDetailsView(currentRequestIdForView); showToast('تم إرسال التنبيه بنجاح.'); } } 
+                    if (target.id === 'save-award-btn') { const sel = document.getElementById('awarded-to-select'); document.getElementById('awardee-name-confirm').textContent = investors[landRequestsData.find(r=>r.requestId === sel.value).investorId].name; ui.confirmAwardModal.classList.remove('hidden'); } 
+                    if (target.matches('.view-other-request-btn')) renderOtherRequestDetailsView(target.dataset.requestId); 
+                    if (target.id === 'other-request-add-fee-btn') ui.addFeeModal.classList.remove('hidden'); 
+                    if (target.id === 'other-request-add-attachment-btn') ui.requestOtherAttachmentModal.classList.remove('hidden'); 
+                    if (target.matches('.governor-decision-btn')) handleGovernorDecision(target.dataset.decision); 
+                    if (target.matches('.other-verify-attachment-btn')) { const req = otherRequestsData.find(r=>r.id===currentOtherRequestId); if(req){ req.attachments[target.dataset.index].status = 'verified'; req.log.push({type: 'attachment_status', user: 'مدير النظام', date: new Date().toISOString(), fileName: req.attachments[target.dataset.index].name, status: 'verified'}); renderOtherRequestDetailsView(currentOtherRequestId); } } 
+                    if (target.matches('.other-reject-attachment-btn')) { currentAttachmentForRejection = { type: 'other', requestId: currentOtherRequestId, index: parseInt(target.dataset.index, 10) }; ui.rejectReasonModal.querySelector('h3').textContent = 'سبب رفض المرفق'; ui.rejectReasonModal.classList.remove('hidden'); } 
+                    if (target.matches('.other-resend-request-btn')) { const req = otherRequestsData.find(r=>r.id===currentOtherRequestId); if(req){ req.attachments[target.dataset.index].status = 'resubmission_requested'; req.attachments[target.dataset.index].resubmissionRequestedOn = new Date().toISOString(); renderOtherRequestDetailsView(currentOtherRequestId); } } 
+                    if (target.id === 'send-payment-requests-btn') { const request = landRequestsData.find(r => r.requestId === currentRequestIdForView); const checkboxes = ui.paymentRequestsList.querySelectorAll('input:checked'); if (checkboxes.length === 0) { showToast('الرجاء تحديد رسم واحد على الأقل', false); return; } checkboxes.forEach(box => { const fee = request.feesPaid[box.value]; fee.history.push({ user: 'مدير النظام', date: new Date().toISOString() }); request.log.push({type: 'payment_reminder', user: 'مدير النظام', date: new Date().toISOString(), feeItem: fee.item}); }); ui.sendPaymentRequestModal.classList.add('hidden'); renderSingleRequestDetailsView(currentRequestIdForView); showToast(`تم إرسال ${checkboxes.length} طلب دفع بنجاح.`); }
+                    if (target.id === 'request-additional-attachment-btn') { const select = document.getElementById('attachment-name-select'); select.innerHTML = '<option value="" disabled selected>-- اختر مرفق --</option>'; landPredefinedAttachments.forEach(name => select.add(new Option(name, name))); ui.requestAttachmentModal.classList.remove('hidden'); }
+                    if (target.matches('#approve-request-btn')) { const request = landRequestsData.find(r => r.requestId === currentRequestIdForView); if (request) { const currentStageIndex = landWorkflowSteps.findIndex(step => step.key === request.workflowStage); if (currentStageIndex < landWorkflowSteps.length - 1) { const nextStage = landWorkflowSteps[currentStageIndex + 1]; request.workflowStage = nextStage.key; request.log.push({ type: 'workflow', user: 'مدير النظام', date: new Date().toISOString(), to: nextStage.key }); showToast(`تمت الموافقة. انتقل الطلب إلى مرحلة "${nextStage.label}".`); renderSingleRequestDetailsView(currentRequestIdForView); } else { showToast('الطلب في المرحلة الأخيرة بالفعل.', false); } } }
+                    // Rescheduling listeners
+                    if (target.matches('.view-rescheduling-details-btn')) { isReschedulingInEditMode = false; renderReschedulingDetailsView(target.dataset.id); }
+                    if (target.id === 'edit-rescheduling-btn') { isReschedulingInEditMode = true; renderReschedulingDetailsView(currentReschedulingRequestId); }
+                    if (target.matches('#approve-rescheduling-btn')) { const request = reschedulingRequestsData.find(r => r.id === currentReschedulingRequestId); if (request && request.workflowStage === 'financial_review') { ui.governorSignatureModal.classList.remove('hidden'); } else if (request) { const currentStageIndex = reschedulingWorkflowSteps.findIndex(step => step.key === request.workflowStage); if (currentStageIndex < reschedulingWorkflowSteps.length - 1) { const nextStage = reschedulingWorkflowSteps[currentStageIndex + 1]; request.workflowStage = nextStage.key; request.log.push({ type: 'workflow', user: 'مدير النظام', date: new Date().toISOString(), to: nextStage.key }); showToast(`تمت الموافقة. انتقل الطلب إلى مرحلة "${nextStage.label}".`); renderReschedulingDetailsView(currentReschedulingRequestId); } } }
+                    if (target.matches('#reject-rescheduling-btn')) { currentAttachmentForRejection = { type: 'rescheduling', requestId: currentReschedulingRequestId }; ui.rejectReasonModal.querySelector('h3').textContent = 'سبب رفض طلب الجدولة'; ui.rejectReasonModal.classList.remove('hidden'); document.getElementById('rejection-reason-text').value = ''; }
+                    if (target.matches('#request-rescheduling-attachment-btn')) { document.getElementById('attachment-name-select').innerHTML = '<option value="" disabled selected>-- اختر مرفق --</option>'; ['كشف حساب بنكي', 'خطاب من جهة العمل', 'أي مستند آخر'].forEach(name => document.getElementById('attachment-name-select').add(new Option(name, name))); ui.requestAttachmentModal.classList.remove('hidden'); }
+                    if (target.matches('.reject-rescheduling-attachment-btn')) { currentAttachmentForRejection = { type: 'rescheduling', requestId: target.dataset.requestId, attachmentIndex: parseInt(target.dataset.attachmentIndex, 10) }; ui.rejectReasonModal.querySelector('h3').textContent = 'سبب رفض المرفق'; ui.rejectReasonModal.classList.remove('hidden'); document.getElementById('rejection-reason-text').value = ''; }
+                    if (target.matches('.verify-rescheduling-attachment-btn')) { const request = reschedulingRequestsData.find(r => r.id === target.dataset.requestId); if(request) { const att = request.attachments[target.dataset.attachmentIndex]; att.status = 'verified'; request.log.push({type: 'attachment_status', user: 'مدير النظام', date: new Date().toISOString(), status: 'verified', fileName: att.name}); renderReschedulingDetailsView(target.dataset.requestId); } } 
+                    if (target.matches('.resend-rescheduling-attachment-btn')) { const request = reschedulingRequestsData.find(r => r.id === target.dataset.requestId); if (request) { const attachment = request.attachments[target.dataset.attachmentIndex]; attachment.status = 'required'; request.log.push({ type: 'attachment_request', user: 'مدير النظام', date: new Date().toISOString(), fileName: attachment.name }); renderReschedulingDetailsView(target.dataset.requestId); showToast('تم تسجيل طلب إعادة الإرسال.'); } }
+                    if (target.id === 'save-rescheduling-changes-btn') { const request = reschedulingRequestsData.find(r => r.id === currentReschedulingRequestId); if (request) { request.proposedStartDate = document.getElementById('rescheduling-start-date').value; request.installmentsCount = parseInt(document.getElementById('rescheduling-installments-count').value, 10); request.penaltyApplied = document.getElementById('penalty-exemption-yes-rs').checked; request.penaltyAmount = request.penaltyApplied ? parseFloat(document.getElementById('rescheduling-penalty-amount').value) : 0; isReschedulingInEditMode = false; request.log.push({ type: 'note', user: 'مدير النظام', date: new Date().toISOString(), note: 'تم تحديث تفاصيل الجدولة.' }); showToast('تم حفظ التعديلات بنجاح.'); renderReschedulingListView(); } }
+                    if (target.matches('.view-attachment-btn')) { ui.attachmentModalFilename.textContent = target.dataset.filename; ui.viewAttachmentModal.classList.remove('hidden'); }
+                });
+                
+                ui.requestsStatusFilterTabs.addEventListener('click', e => { if (e.target.matches('.requests-tab-button')) { ui.requestsStatusFilterTabs.querySelectorAll('button').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); renderRequestsSummaryView(); } });
+                ui.requestsMechanismFilterTabs.addEventListener('click', e => { if (e.target.matches('.requests-tab-button')) { ui.requestsMechanismFilterTabs.querySelectorAll('button').forEach(btn => btn.classList.remove('active')); e.target.classList.add('active'); renderRequestsSummaryView(); } });
+                document.body.addEventListener('change', e => { 
+                    if (e.target.id === 'awarded-to-select') { document.getElementById('award-details-fields').classList.toggle('hidden', !e.target.value); document.getElementById('save-award-btn').disabled = !e.target.value; }
+                    if (e.target.name === 'penalty-exemption-rs') { document.getElementById('penalty-amount-container-rs').classList.toggle('hidden', e.target.value !== 'yes'); updateReschedulingPaymentPlan(); }
+                });
+                document.body.addEventListener('input', e => {
+                    if (['rescheduling-penalty-amount', 'rescheduling-installments-count', 'rescheduling-start-date'].includes(e.target.id)) { updateReschedulingPaymentPlan(); }
+                });
+                ui.closeRejectModalBtn.addEventListener('click', () => ui.rejectReasonModal.classList.add('hidden')); ui.cancelRejectionBtn.addEventListener('click', () => ui.rejectReasonModal.classList.add('hidden')); ui.confirmRejectionBtn.addEventListener('click', handleAttachmentRejection);
+                ui.closePaymentModalBtn.addEventListener('click', () => ui.sendPaymentRequestModal.classList.add('hidden')); ui.cancelPaymentRequestBtn.addEventListener('click', () => ui.sendPaymentRequestModal.classList.add('hidden')); ui.confirmPaymentRequestBtn.addEventListener('click', () => { const request = landRequestsData.find(r => r.requestId === currentRequestIdForView); const checkboxes = ui.paymentRequestsList.querySelectorAll('input:checked'); if (checkboxes.length === 0) { showToast('الرجاء تحديد رسم واحد على الأقل', false); return; } checkboxes.forEach(box => { const fee = request.feesPaid[box.value]; fee.history.push({ user: 'مدير النظام', date: new Date().toISOString() }); request.log.push({type: 'payment_reminder', user: 'مدير النظام', date: new Date().toISOString(), feeItem: fee.item}); }); ui.sendPaymentRequestModal.classList.add('hidden'); renderSingleRequestDetailsView(currentRequestIdForView); showToast(`تم إرسال ${checkboxes.length} طلب دفع بنجاح.`); });
+                ui.closeAttachmentModalBtn.addEventListener('click', () => ui.requestAttachmentModal.classList.add('hidden')); ui.cancelAttachmentRequestBtn.addEventListener('click', () => ui.requestAttachmentModal.classList.add('hidden')); 
+                ui.confirmAttachmentRequestBtn.addEventListener('click', () => { 
+                    const attachmentName = document.getElementById('attachment-name-select').value;
+                    if (!attachmentName) { showToast('الرجاء اختيار اسم المرفق المطلوب', false); return; }
+                    let request;
+                    let renderFunc;
+                    if(ui.singleRequestDetailsView.offsetParent !== null) {
+                        request = landRequestsData.find(r => r.requestId === currentRequestIdForView);
+                        renderFunc = () => renderSingleRequestDetailsView(currentRequestIdForView);
+                    } else if (ui.reschedulingDetailsView.offsetParent !== null) {
+                        request = reschedulingRequestsData.find(r => r.id === currentReschedulingRequestId);
+                        renderFunc = () => renderReschedulingDetailsView(currentReschedulingRequestId);
+                    }
+                    if(request) {
+                        if(!request.attachments) request.attachments = [];
+                        request.attachments.push({ name: attachmentName, status: 'required' }); 
+                        request.log.push({type: 'attachment_request', user: 'مدير النظام', date: new Date().toISOString(), fileName: attachmentName}); 
+                        renderFunc();
+                    }
+                    ui.requestAttachmentModal.classList.add('hidden'); 
+                    showToast('تم إرسال طلب المرفق بنجاح.'); 
+                });
+                ui.closeAwardModalBtn.addEventListener('click', () => ui.confirmAwardModal.classList.add('hidden')); ui.cancelAwardBtn.addEventListener('click', () => ui.confirmAwardModal.classList.add('hidden')); 
+                ui.confirmAwardBtn.addEventListener('click', () => { 
+                    const winnerId = document.getElementById('awarded-to-select').value; 
+                    const governorNotes = document.getElementById('governor-notes-input').value; 
+                    const handoverDate = document.getElementById('handover-date-input').value; 
+                    const handoverFile = document.getElementById('handover-file-input').files[0]; 
+                    const finalPrice = parseFloat(document.getElementById('final-price-input').value);
+                    if (!finalPrice || finalPrice <= 0) { showToast('الرجاء إدخال سعر صحيح للفدان بعد المزاد', false); return; }
+                    if (!governorNotes.trim()) { showToast('تأشيرة المحافظ حقل إلزامي', false); return; } 
+                    const offering = offeringsList.find(o => o.lands.some(l => l.landId === currentLandIdForDetails)); 
+                    const landInOffering = offering.lands.find(l => l.landId === currentLandIdForDetails); 
+                    const land = availableLands.find(l => l.id === currentLandIdForDetails);
+                    landInOffering.awardDetails = { awardedToRequestId: winnerId, handoverDate: handoverDate, handoverFileName: handoverFile ? handoverFile.name : 'لم يتم الرفع', governorNotes: governorNotes, finalPricePerFeddans: finalPrice }; 
+                    landRequestsData.filter(r => r.landId === currentLandIdForDetails).forEach(req => { 
+                        if (req.requestId === winnerId) { 
+                            req.status = 'awarded'; 
+                            req.finalPrice = finalPrice * land.areaFeddans;
+                            req.log.push({type: 'note', user: 'المحافظ', date: new Date().toISOString(), note: `تمت الترسية والتخصيص بسعر ${formatCurrency(finalPrice)} للفدان. ملاحظات: ${governorNotes}`}); 
+                        } else { 
+                            req.status = 'rejected'; 
+                            req.rejectionReason = 'تم تخصيص الأرض لمستثمر آخر.'; 
+                            req.log.push({type: 'note', user: 'النظام', date: new Date().toISOString(), note: `تم رفض الطلب تلقائياً بسبب تخصيص الأرض لمستثمر آخر.`}); 
+                        } 
+                    }); 
+                    ui.confirmAwardModal.classList.add('hidden'); 
+                    document.getElementById('governor-notes-input').value = ''; 
+                    document.getElementById('final-price-input').value = '';
+                    renderRequestDetailsView(currentLandIdForDetails); 
+                    showToast('تم تسجيل قرار التخصيص بنجاح.'); 
+                });
+                ui.closeAddFeeModalBtn.addEventListener('click', () => ui.addFeeModal.classList.add('hidden')); ui.cancelAddFeeBtn.addEventListener('click', () => ui.addFeeModal.classList.add('hidden')); ui.addFeeModal.addEventListener('change', e => { if (e.target.name === 'payment-method') ui.installmentsDetailsContainer.classList.toggle('hidden', e.target.value !== 'installments'); }); ui.confirmAddFeeBtn.addEventListener('click', handleAddFee);
+                ui.closeOtherAttachmentModalBtn.addEventListener('click', () => ui.requestOtherAttachmentModal.classList.add('hidden')); ui.cancelOtherAttachmentRequestBtn.addEventListener('click', () => ui.requestOtherAttachmentModal.classList.add('hidden')); ui.confirmOtherAttachmentRequestBtn.addEventListener('click', handleRequestOtherAttachment);
+                ui.closeGovernorSignatureModalBtn.addEventListener('click', () => ui.governorSignatureModal.classList.add('hidden')); ui.cancelGovernorSignatureBtn.addEventListener('click', () => ui.governorSignatureModal.classList.add('hidden'));
+                ui.confirmGovernorSignatureBtn.addEventListener('click', () => { const request = reschedulingRequestsData.find(r => r.id === currentReschedulingRequestId); if (request) { const notes = document.getElementById('governor-signature-notes').value; const file = document.getElementById('governor-signature-file').files[0]; if (!notes && !file) { showToast('يرجى إدخال تأشيرة كتابية أو إرفاق ملف.', false); return; } const logNote = notes || `تم إرفاق ملف ${file.name}`; request.log.push({ type: 'governor_decision', user: 'المحافظ', date: new Date().toISOString(), decision: 'approved', notes: logNote }); request.workflowStage = 'completed'; request.status = 'approved'; request.log.push({ type: 'workflow', user: 'المحافظ', date: new Date().toISOString(), to: 'completed' }); showToast(`تم اعتماد الطلب بنجاح.`); renderReschedulingDetailsView(currentReschedulingRequestId); ui.governorSignatureModal.classList.add('hidden'); } });
+                ui.closeInvestorModalBtn.addEventListener('click', () => ui.investorDetailsModal.classList.add('hidden'));
+                ui.closeAttachmentViewerBtn.addEventListener('click', () => ui.viewAttachmentModal.classList.add('hidden'));
+                ui.sendNotesBtn.addEventListener('click', () => { const notesText = document.getElementById('notes-for-investor').value.trim(); if (!notesText) { showToast('الرجاء كتابة ملاحظة أولاً', false); return; } const request = landRequestsData.find(r => r.requestId === currentRequestIdForView); request.log.push({ type: 'note', user: 'مدير النظام', date: new Date().toISOString(), note: notesText }); document.getElementById('notes-for-investor').value = ''; renderSingleRequestDetailsView(currentRequestIdForView); showToast('تم إرسال الملاحظة بنجاح.'); });
+                ui.backToRequestsListBtn.addEventListener('click', () => renderRequestsSummaryView()); 
+                ui.backToRequestListForLandBtn.addEventListener('click', () => renderRequestDetailsView(currentLandIdForDetails)); 
+                ui.backToOtherRequestsListBtn.addEventListener('click', () => renderOtherRequestsSummaryView());
+                ui.backToReschedulingListBtn.addEventListener('click', () => renderReschedulingListView());
+            }
+            function init() { 
+                initializeEventListeners(); 
+                renderRequestsSummaryView(); 
+            }
+            init();
+        });
+    </script>
+</body>
+</html>
